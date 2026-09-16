@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Environment
+.env
+
+# OS / editor
+.DS_Store
+.obsidian/
+.vscode/
+.idea/
