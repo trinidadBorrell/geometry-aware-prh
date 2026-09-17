@@ -50,7 +50,7 @@ def get_models(modelset, modality='all'):
             "mistralai/Mixtral-8x7B-v0.1",
             # "mistralai/Mixtral-8x22B-v0.1",
             "NousResearch/Meta-Llama-3-8B",
-            "NousResearch/Meta-Llama-3-70B",
+            # "NousResearch/Meta-Llama-3-70B",
         ]
         
         lvm_models = []
@@ -67,8 +67,8 @@ def get_models(modelset, modality='all'):
             "openlm-research/open_llama_13b",
             "huggyllama/llama-7b",
             "huggyllama/llama-13b",
-            "huggyllama/llama-30b",
-            "huggyllama/llama-65b",
+            # "huggyllama/llama-30b",
+            # "huggyllama/llama-65b",
             "allenai/OLMo-1B-hf",
             "allenai/OLMo-7B-hf", 
             "google/gemma-2b",
@@ -77,7 +77,7 @@ def get_models(modelset, modality='all'):
             "mistralai/Mixtral-8x7B-v0.1",
             # "mistralai/Mixtral-8x22B-v0.1", # was too big so did not use
             "NousResearch/Meta-Llama-3-8B",
-            "NousResearch/Meta-Llama-3-70B",
+            # "NousResearch/Meta-Llama-3-70B",
         ]
         lvm_models = [
             "vit_giant_patch14_dinov2.lvd142m",
