@@ -24,7 +24,6 @@ torchinfo
 torchmetrics
 wandb
 opencv-python
-deepspeed
 gdown
 h5py
 av

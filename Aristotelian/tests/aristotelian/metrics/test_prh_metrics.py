@@ -8,9 +8,7 @@ import pytest
 import torch
 
 # Add external_code to path to import original implementation
-sys.path.insert(
-    0, str(Path(__file__).resolve().parents[3] / "external_code" / "platonic-rep")
-)
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "platonic-rep"))
 
 from metrics import AlignmentMetrics as OriginalMetrics
 from metrics import compute_knn_accuracy as original_compute_knn_accuracy
