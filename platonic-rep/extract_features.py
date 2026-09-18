@@ -147,7 +147,11 @@ def extract_lvm_features(filenames, dataset, args):
         else:
             raise NotImplementedError(f"unknown model {lvm_model_name}")
 
-        vision_model = create_feature_extractor(vision_model, return_nodes=return_nodes)
+        vision_model = create_feature_extractor(
+            vision_model, 
+            return_nodes=return_nodes,
+            concrete_args={'is_causal': False, 'attn_mask': None}
+        )
         lvm_feats = []
 
         for i in trange(0, len(dataset), args.batch_size):
