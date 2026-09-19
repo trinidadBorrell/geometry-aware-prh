@@ -17,6 +17,10 @@ from models import load_llm, load_tokenizer
 import utils 
     
 
+# timm>=1.0.26 ViTs take (attn_mask, is_causal) in forward(); pin them for torch.fx tracing,
+# otherwise is_causal becomes a Proxy and F.scaled_dot_product_attention rejects it.
+VIT_FX_CONCRETE_ARGS = {"attn_mask": None, "is_causal": False}
+
 def extract_llm_features(filenames, dataset, args):
     """
     Extracts features from language models.
@@ -147,7 +151,7 @@ def extract_lvm_features(filenames, dataset, args):
         else:
             raise NotImplementedError(f"unknown model {lvm_model_name}")
 
-        vision_model = create_feature_extractor(vision_model, return_nodes=return_nodes)
+        vision_model = create_feature_extractor(vision_model, return_nodes=return_nodes, concrete_args=VIT_FX_CONCRETE_ARGS)
         lvm_feats = []
 
         for i in trange(0, len(dataset), args.batch_size):
@@ -182,7 +186,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset",        type=str, default="prh")
     parser.add_argument("--subset",         type=str, default="wit_1024")
     parser.add_argument("--caption_idx",    type=int, default=0)
-    parser.add_argument("--modelset",       type=str, default="val", choices=["val", "test"])
+    parser.add_argument("--modelset",       type=str, default="val", choices=["val", "test", "small"])
     parser.add_argument("--modality",       type=str, default="all", choices=["vision", "language", "all"])
     parser.add_argument("--output_dir",     type=str, default="./results/features")
     parser.add_argument("--qlora",          action="store_true")

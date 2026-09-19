@@ -40,6 +40,10 @@ from .prh_data import iter_prh_samples
 from .prh_models import get_models, load_text_model, load_vision_model
 from .prh_pipeline import collect_text_activations, collect_vision_activations
 
+# timm>=1.0.26 ViTs take (attn_mask, is_causal) in forward(); pin them for torch.fx tracing,
+# otherwise is_causal becomes a Proxy and F.scaled_dot_product_attention rejects it.
+VIT_FX_CONCRETE_ARGS = {"attn_mask": None, "is_causal": False}
+
 
 def _stack_layers(layers: Sequence[np.ndarray]) -> torch.Tensor:
     tensors = [torch.tensor(x) for x in layers]
@@ -113,7 +117,9 @@ def _extract_vision_features(
         return_nodes = [f"blocks.{i}.add_1" for i in range(len(model.blocks))]
     else:
         raise NotImplementedError(f"unknown model {model_name}")
-    feat_model = create_feature_extractor(model, return_nodes=return_nodes)
+    feat_model = create_feature_extractor(
+        model, return_nodes=return_nodes, concrete_args=VIT_FX_CONCRETE_ARGS
+    )
     layers = collect_vision_activations(
         images,
         model=feat_model,

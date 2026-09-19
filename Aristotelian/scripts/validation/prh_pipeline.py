@@ -28,7 +28,7 @@ import torch
 import torch.nn.functional as F
 
 # Add original PRH code to path
-sys.path.insert(0, str(PROJECT_ROOT / "external_code" / "platonic-rep"))
+sys.path.insert(0, str(PROJECT_ROOT.parent / "platonic-rep"))
 from metrics import AlignmentMetrics as OriginalMetrics
 
 from aristotelian import cka, mutual_knn

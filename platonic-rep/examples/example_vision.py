@@ -8,6 +8,10 @@ from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from torchvision.models.feature_extraction import create_feature_extractor
 
+# timm>=1.0.26 ViTs take (attn_mask, is_causal) in forward(); pin them for torch.fx tracing,
+# otherwise is_causal becomes a Proxy and F.scaled_dot_product_attention rejects it.
+VIT_FX_CONCRETE_ARGS = {"attn_mask": None, "is_causal": False}
+
 
 # setup platonic metric
 platonic_metric = platonic.Alignment(
@@ -29,7 +33,7 @@ transform = create_transform(
 
 # extract features
 return_nodes = [f"blocks.{i}.add_1" for i in range(len(vision_model.blocks))]
-vision_model = create_feature_extractor(vision_model, return_nodes=return_nodes)
+vision_model = create_feature_extractor(vision_model, return_nodes=return_nodes, concrete_args=VIT_FX_CONCRETE_ARGS)
 
 lvm_feats = []
 batch_size = 32

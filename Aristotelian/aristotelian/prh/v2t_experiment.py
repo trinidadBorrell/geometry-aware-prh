@@ -52,6 +52,10 @@ from .video_models import (
     load_video_model,
 )
 
+# timm>=1.0.26 ViTs take (attn_mask, is_causal) in forward(); pin them for torch.fx tracing,
+# otherwise is_causal becomes a Proxy and F.scaled_dot_product_attention rejects it.
+VIT_FX_CONCRETE_ARGS = {"attn_mask": None, "is_causal": False}
+
 
 def _extract_video_features(
     video_sources: List[Any],
@@ -356,7 +360,9 @@ def _extract_frame_by_frame_features(
     # Determine return nodes based on model architecture
     if hasattr(model, "blocks"):
         return_nodes = [f"blocks.{i}.add_1" for i in range(len(model.blocks))]
-        feat_model = create_feature_extractor(model, return_nodes=return_nodes)
+        feat_model = create_feature_extractor(
+            model, return_nodes=return_nodes, concrete_args=VIT_FX_CONCRETE_ARGS
+        )
     else:
         feat_model = model
         return_nodes = None

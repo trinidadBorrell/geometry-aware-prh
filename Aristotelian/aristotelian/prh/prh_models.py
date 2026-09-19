@@ -107,6 +107,19 @@ def get_models(modelset: str, modality: str = "all") -> Tuple[List[str], List[st
             "google/gemma-2-9b-it",
         ]
         lvm_models = []
+    elif modelset == "small":
+        # Small subset of "val" for quick replication (fits a 6 GB GPU)
+        llm_models = [
+            "bigscience/bloomz-560m",
+            "bigscience/bloomz-1b1",
+            "bigscience/bloomz-1b7",
+        ]
+        lvm_models = [
+            "vit_tiny_patch16_224.augreg_in21k",
+            "vit_base_patch16_224.augreg_in21k",
+            "vit_small_patch14_dinov2.lvd142m",
+            "vit_base_patch16_clip_224.laion2b",
+        ]
     else:
         raise ValueError(f"Unknown modelset: {modelset}")
 
