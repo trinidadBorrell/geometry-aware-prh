@@ -1,0 +1,82 @@
+[project]
+name = "geometry-aware-prh"
+version = "0.1.0"
+description = "Do the Platonic and Aristotelian hypotheses disagree only because we measure with the wrong geometry?"
+readme = "README.md"
+requires-python = "==3.11.*"
+dependencies = [
+    # Torch stack pinned to the Runpod image line (torch 2.8 / CUDA 12.8).
+    "torch==2.8.*",
+    "torchvision==0.23.*",
+    "torchaudio==2.8.*",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "scikit-learn==1.5.2",
+    # Upstream PRH model loading predates transformers 5.
+    "transformers>=4.45,<5",
+    "accelerate>=0.34",
+    "timm>=1.0",
+    "datasets>=3.0",
+    "huggingface-hub>=0.25",
+    "sentencepiece",
+    "protobuf",
+    "tqdm",
+    "loguru",
+    "matplotlib",
+    "pillow",
+    # Aristotelian's calibration package; its editable install also puts
+    # Aristotelian/ on sys.path, which makes `aristotelian` and `scripts` importable.
+    "calibrated-similarity",
+    "hf-xet>=1.6.0",
+]
+
+[project.optional-dependencies]
+video = ["decord>=0.6.0", "opencv-python>=4.5.0"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13",
+    "pre-commit>=4.0",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ipykernel",
+    # used by a few Aristotelian tests
+    "tables",
+    "imagehash",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["Aristotelian"]
+
+[tool.uv.sources]
+calibrated-similarity = { workspace = true }
+torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+torchaudio = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+# ----------------------------------------------------------------------------
+# Ruff: enforced on our own code only. The upstream code in Aristotelian/ and
+# platonic-rep/ is kept byte-identical to ease merges and diffing upstream.
+# ----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["Aristotelian", "platonic-rep", "*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "NPY", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["aristotelian", "calibrated_similarity"]
+
+[tool.ruff.format]
+quote-style = "double"
