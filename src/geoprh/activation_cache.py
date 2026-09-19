@@ -35,6 +35,7 @@ from pathlib import Path
 import torch
 
 DEFAULT_ROOT = "/workspace/activations"
+EXTRA_KEYS = ("loss", "bpb")
 LAYER_DEFS = {
     "language": "hidden_states[i] of the causal LM (0 = token embeddings), masked token pooling",
     "vision": "timm ViT blocks.{i}.add_1 (block output), token pooling",
@@ -122,6 +123,8 @@ def push_model(
             "dtype": str(x.dtype).removeprefix("torch."),
             "shape": list(x.shape),
             "num_params": int(payload.get("num_params", 0)) or None,
+            # per-model scalars saved by the extractor (platonic-rep: caption loss, bits-per-byte)
+            "extras": {k: float(payload[k]) for k in EXTRA_KEYS if k in payload},
             "extractor": extractor,
             "source_file": str(feature_file),
             "created_by": os.environ.get("PERSON") or getpass.getuser(),
@@ -132,24 +135,31 @@ def push_model(
     return written
 
 
-def pull_model(root: Path, model: str, variant: Variant, dest: Path) -> bool:
-    """Rebuild an upstream `{"feats": [n, L, d], "num_params"}` file from the cache.
+def load_model(root: Path, model: str, variant: Variant) -> dict | None:
+    """Load all cached layers as an upstream-style payload, or None unless fully cached.
 
-    Returns False (and writes nothing) unless every layer 0..L-1 is cached.
+    Returns `{"feats": [n, L, d], "num_params": int, **extras}` (extras: loss, bpb).
     """
     layers = cached_layers(root, model, variant)
     if not layers:
-        return False
-    metas = [json.loads(layer_paths(root, model, i, variant)[1].read_text()) for i in layers]
-    num_layers = metas[0]["num_layers"]
-    if layers != list(range(num_layers)):
-        return False
+        return None
+    meta = json.loads(layer_paths(root, model, layers[0], variant)[1].read_text())
+    if layers != list(range(meta["num_layers"])):
+        return None
     feats = torch.stack(
         [torch.load(layer_paths(root, model, i, variant)[0], map_location="cpu") for i in layers],
         dim=1,
     )
+    return {"feats": feats, "num_params": meta["num_params"], **meta.get("extras", {})}
+
+
+def pull_model(root: Path, model: str, variant: Variant, dest: Path) -> bool:
+    """Rebuild an upstream feature file from the cache; False unless fully cached."""
+    payload = load_model(root, model, variant)
+    if payload is None:
+        return False
     dest.parent.mkdir(parents=True, exist_ok=True)
-    _atomic_save({"feats": feats, "num_params": metas[0]["num_params"]}, dest)
+    _atomic_save(payload, dest)
     return True
 
 
@@ -170,7 +180,8 @@ def upstream_filename(model: str, variant: Variant, layout: str) -> str:
     raise ValueError(f"unknown layout {layout!r}")
 
 
-def _models(modelset: str) -> list[tuple[str, Variant]]:
+def models(modelset: str) -> list[tuple[str, Variant]]:
+    """(model, variant) for every model in an upstream PRH modelset (text: avg, vision: cls)."""
     from aristotelian.prh.prh_models import get_models
 
     llms, lvms = get_models(modelset)
@@ -190,7 +201,7 @@ def main() -> None:
     args = parser.parse_args()
     root = args.root or default_root()
 
-    for model, variant in _models(args.modelset):
+    for model, variant in models(args.modelset):
         fname = upstream_filename(model, variant, args.layout)
         if args.command == "ls":
             layers = cached_layers(root, model, variant)

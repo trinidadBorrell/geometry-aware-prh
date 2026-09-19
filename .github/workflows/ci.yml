@@ -27,6 +27,8 @@ jobs:
         run: uv sync --locked --all-groups
       - name: Lockfile is up to date
         run: uv lock --check
+      - name: Tests (geoprh parity with platonic-rep metrics)
+        run: uv run pytest -q tests
       - name: Tests (calibration package + PRH metric parity with platonic-rep)
         working-directory: Aristotelian
         run: >
