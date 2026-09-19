@@ -74,31 +74,61 @@ uv run python experiments/prh_small/run_aristotelian.py --device cuda --metrics 
 uv run python experiments/prh_small/compare.py
 ```
 
+## Activation cache (never repeat a forward pass)
+
+Activations live once on the team volume, per model and layer
+(see `/workspace/README.md`):
+
+```
+/workspace/activations/<model>/layer_XX/<dataset>.pt          # [n_samples, dim] tensor
+/workspace/activations/<model>/layer_XX/<dataset>.meta.json   # model, layer, dataset, seed, dtype, shape, ...
+```
+
+`<model>` is the HF/timm name with `/` replaced by `__`; `<dataset>` encodes dataset, subset,
+pooling and caption index (e.g. `minhuh_prh_wit_1024_pool-avg_cid-0`). `geoprh.activation_cache`
+bridges it to the upstream per-model feature files without touching upstream code:
+
+```bash
+uv run python -m geoprh.activation_cache ls   --modelset small                 # what is cached
+uv run python -m geoprh.activation_cache pull --modelset small --layout platonic --dir <features dir>
+uv run python -m geoprh.activation_cache push --modelset small --layout platonic --dir <features dir>
+```
+
+`pull` rebuilds upstream files from the cache, so the upstream extraction skips them; `push`
+stores new ones (it never overwrites). Locally, set `ACTIVATIONS_DIR` to a local folder.
+
 ## Running on Runpod
 
 Read `CLAUDE.md` for the team rules first (EU-RO-1 only, one pod at a time, state the price,
-always **terminate**). Outputs go to `/workspace/results/<person>/`.
+always **terminate**). Outputs go to `/workspace/results/<person>/`. Pods can be created with
+`runpodctl` or by asking Claude (Runpod MCP tools). From Git Bash at the repo root:
 
-1. **Create a GPU pod** (with `runpodctl` or by asking Claude, which uses the Runpod MCP tools) (e.g. `NVIDIA L4` or `NVIDIA RTX PRO 4000 Blackwell` for small models)
-   from template `sw0wyyvy63` with volume `7mcpsbxer7` mounted at `/workspace`:
+1. **Create a GPU pod** from template `sw0wyyvy63` with volume `7mcpsbxer7` at `/workspace`
+   (small models: `NVIDIA RTX PRO 4500 Blackwell`, $0.72/h):
    ```bash
-   runpodctl pod create --name oddharak-prh-small --template-id sw0wyyvy63 \
-     --network-volume-id 7mcpsbxer7 --data-center-ids EU-RO-1 --gpu-id "NVIDIA L4" --wait
-   runpodctl pod get <pod-id>        # note the public IP and the port mapped to 22
+   runpodctl pod create --name oddharak-prh-small --template-id sw0wyyvy63      --network-volume-id 7mcpsbxer7 --data-center-ids EU-RO-1      --gpu-id "NVIDIA RTX PRO 4500 Blackwell" --wait
    ```
-2. **Push code and set up the environment** (from Git Bash, at the repo root):
+   Wait until the pod lists a public port for `22/tcp` (`runpodctl pod get <id>`). That is the
+   **direct** SSH address, `ssh root@<ip> -p <port>`. The `ssh.runpod.io` proxy only gives
+   interactive shells (no commands, no scp).
+2. **Look around.** `ssh root@<ip> -p <port>` opens a shell. Useful commands:
+   `nvidia-smi`, `df -h /workspace`, `cat /workspace/README.md`, `ls /workspace/activations`.
+   Non-interactive commands (`ssh host "cmd"`) do not see `HF_HOME`/`RUNPOD_*`, so start them
+   with `. /etc/rp_environment;`.
+3. **Push code and set up the environment:**
    ```bash
-   infra/runpod/push_code.sh <ip> <port>
-   ssh -p <port> root@<ip> "bash /root/geometry-aware-prh/infra/runpod/setup_pod.sh"
+   infra/runpod/push_code.sh <ip> <port>     # tar of the working tree -> /root/geometry-aware-prh
+   ssh root@<ip> -p <port> "bash /root/geometry-aware-prh/infra/runpod/setup_pod.sh"
    ```
-3. **Launch detached.** The job terminates its own pod when it succeeds:
+4. **Launch detached** (survives SSH disconnects). The job pulls from the activation cache,
+   extracts only what is missing, pushes new activations back, then computes alignment:
    ```bash
-   ssh -p <port> root@<ip> "mkdir -p /workspace/results/oddharak && cd /root/geometry-aware-prh && \
-     nohup bash infra/runpod/run_prh_small.sh > /workspace/results/oddharak/prh_small.log 2>&1 &"
+   ssh root@<ip> -p <port> "mkdir -p /workspace/results/oddharak && cd /root/geometry-aware-prh &&      AUTO_TERMINATE=1 nohup bash infra/runpod/run_prh_small.sh > /workspace/results/oddharak/prh_small.log 2>&1 &"
    ```
-4. **Monitor** with `ssh -p <port> root@<ip> tail -f /workspace/results/oddharak/prh_small.log`.
-   After it finishes, check `runpodctl pod list` to confirm nothing is left running. If the job
-   failed, the pod stays up for debugging, so terminate it yourself (`runpodctl remove pod <id>`, or ask Claude to use the Runpod MCP `delete-pod`).
-5. **Get the results.** The pod is gone, but `/workspace` persists. Either start a cheap CPU pod
-   (template `10tnena836`, `--compute-type CPU`) and `scp` from it, or run the analysis on
-   that pod.
+   With `AUTO_TERMINATE=1` a successful run removes its own pod; a failed run leaves it up.
+5. **Monitor:** `ssh root@<ip> -p <port> "tail -f /workspace/results/oddharak/prh_small.log"`.
+6. **Copy results home** while the pod is up:
+   `scp -P <port> -r root@<ip>:/workspace/results/oddharak/prh_small/*/alignment results/pod/`
+   (the volume persists after the pod is gone).
+7. **Terminate** (`runpodctl remove pod <id>`, or ask Claude) and confirm with
+   `runpodctl pod list` that nothing is left running.

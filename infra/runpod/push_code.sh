@@ -11,5 +11,5 @@ cd "$(git rev-parse --show-toplevel)"
 git ls-files -z --cached --others --exclude-standard \
   | tar --null -T - -cf - \
   | ssh -p "$PORT" -o StrictHostKeyChecking=accept-new "root@$IP" \
-      "mkdir -p $REMOTE_DIR && tar -xf - -C $REMOTE_DIR"
+      "mkdir -p $REMOTE_DIR && tar --no-same-owner -xf - -C $REMOTE_DIR"
 echo "code synced to $IP:$REMOTE_DIR"
