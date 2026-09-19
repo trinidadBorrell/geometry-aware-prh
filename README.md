@@ -132,3 +132,18 @@ always **terminate**). Outputs go to `/workspace/results/<person>/`. Pods can be
    (the volume persists after the pod is gone).
 7. **Terminate** (`runpodctl remove pod <id>`, or ask Claude) and confirm with
    `runpodctl pod list` that nothing is left running.
+
+## PRH paper figures (val set, CPU)
+
+`geoprh.prh_alignment` reproduces platonic-rep's `measure_alignment` (q=0.95 clamp, l2 norm,
+max over layer pairs) on CPU with per-layer caching; `tests/test_prh_alignment.py` checks it
+against `metrics.AlignmentMetrics`. It reads activations from the shared cache.
+
+```bash
+ssh root@<ip> -p <port> 'BRANCH=oddharak bash -s' < infra/runpod/setup_pod.sh
+ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && WORKERS=16 nohup bash infra/runpod/run_prh_val.sh > /workspace/results/oddharak/prh_val.log 2>&1 &"
+```
+
+Outputs (`/workspace/results/oddharak/prh_val/`): `cross_modal.npz/json` (10 LLMs x 17 ViTs, 15
+metrics), `vision_vision.npz/json`, `figures/` (PRH Fig. 3, 10, 12, 13, 14). Each worker needs
+~3 GB RAM; size `WORKERS` by memory, not `nproc` (pods report host cores).
