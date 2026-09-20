@@ -1,0 +1,15 @@
+{
+  "a": "bloomz-560m",
+  "b": "dinov2-small",
+  "joint_perm_mknn": 0.01582031324505806,
+  "narrow_rbf_cka": 0.7834309339523315,
+  "narrow_rbf_self": 1.0,
+  "one_sided_perm_mknn": 0.01445312611758709,
+  "ortho_linear_cka": 0.999992311000824,
+  "random_linear_cka": 0.36851078271865845,
+  "random_mknn": 0.01142578199505806,
+  "rescale_linear_cka": 1.0000004768371582,
+  "self_linear_cka": 1.0,
+  "self_mknn": 1.0,
+  "unbiased_linear_cka": 0.14494100213050842
+}

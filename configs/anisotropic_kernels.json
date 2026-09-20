@@ -1,0 +1,28 @@
+{
+  "name": "anisotropic_kernels_v1",
+  "label": "Bounded PCA-subspace anisotropic metrics on frozen PRH layers",
+  "parent": "results/learned_kernels",
+  "do_not_modify": ["results/original", "results/modern", "results/prh_released_code", "results/learned_kernels", "results/flex_kernels"],
+  "evaluation_status": "exploratory",
+  "evaluation_status_reason": "Same COCO test gallery as learned-kernel / flex-kernel extensions; not a new PRH replication result.",
+  "layers": "reuse results/learned_kernels/layers.json (train max linear CKA)",
+  "q": 32,
+  "eig_bounds": [0.25, 4.0],
+  "log_bound": 1.3862943611198906,
+  "families": {
+    "diag": "B=diag(exp(h)), h_i in [-log 4, log 4]",
+    "full": "B=exp(S) with symmetric S, eigenvalues of S in [-log 4, log 4]"
+  },
+  "residual": "M = I + U(B-I)U^T; identity on the orthogonal complement of span(U)",
+  "tau_grid": [0.0, 0.01, 0.1, 1.0],
+  "objectives": ["ratio", "excess"],
+  "starts": ["identity", "pert0", "pert1"],
+  "shuffle_pairs": [["bloomz-560m", "dinov2-small"], ["qwen3-0.6b-base", "clip-laion-base"], ["olmo-1b-0724", "vit-in21k-small"]],
+  "shuffle_seeds": [0, 1, 2],
+  "stability_subsets": 3,
+  "subset_size": 682,
+  "subset_seed": 7,
+  "n_perm_eval": 40,
+  "mnn_k": 10,
+  "no_metric_transfer": true
+}

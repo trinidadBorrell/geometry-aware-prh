@@ -1,0 +1,182 @@
+{
+  "clip-laion-base:test": {
+    "bytes": 1603752,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/clip-laion-base/4744354d85f57da0.pt",
+    "sha256": "186c987d942e2ad2fa7388edf8e2ead861ccb0360277bef2c72afd061bb2ef87"
+  },
+  "clip-laion-base:train": {
+    "bytes": 3206120,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/clip-laion-base/f12c431bd31f456a.pt",
+    "sha256": "5af3fa4bfbccfa3adc3dfbdec8d9112ac1f741ae265167dd458f9c88fec20947"
+  },
+  "clip-laion-base:val": {
+    "bytes": 1603816,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/clip-laion-base/8ea361fc15294f97.pt",
+    "sha256": "6a0bc007af0088b472989961d1b01991ed121e72ef465e6697c20fbcbf3f16ff"
+  },
+  "dinov2-small:test": {
+    "bytes": 817320,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/dinov2-small/8aec0072da4a60b8.pt",
+    "sha256": "b3184e269a263382f3c1aa3d1b37f265444632f63698b1e3fb3faf29bbcacb07"
+  },
+  "dinov2-small:train": {
+    "bytes": 1633256,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/dinov2-small/4e85f9de90e298fa.pt",
+    "sha256": "cd595b8d96805fc6ce43e1035730115172370a8f52ca9d4890b3c59a5a4e79af"
+  },
+  "dinov2-small:val": {
+    "bytes": 817384,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/dinov2-small/84a0ba852012b27a.pt",
+    "sha256": "7874c763b5c937fbfb22db3d85f5226d34d8dbe90c3756361c6b8f3956dd6e17"
+  },
+  "olmo-3-1025-7b:test": {
+    "bytes": 8419688,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/olmo-3-1025-7b/b645a764d447afcf.pt",
+    "sha256": "908ec2b3211fdb7886719719dcf89d70195184549fc991d360d86710ca2fd98f"
+  },
+  "olmo-3-1025-7b:train": {
+    "bytes": 16837800,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/olmo-3-1025-7b/4dd9b0f1b6f9ef4f.pt",
+    "sha256": "8932c602af1f752798c23f3f78e09c22af965a9b6de97c989c4cccb3663c0d0c"
+  },
+  "olmo-3-1025-7b:val": {
+    "bytes": 8419752,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/olmo-3-1025-7b/4ea42d5f31a888ba.pt",
+    "sha256": "1919dde5e37ebc3eb2273ffec5b6ae13244365835fad626bb8f4ed2ce03b7d45"
+  },
+  "olmo-7b-0724:test": {
+    "bytes": 8419688,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/olmo-7b-0724/71307f8141a47cd8.pt",
+    "sha256": "513c692baece455c71a5ffd2f4570aca940a19eac8fdc32f174a03cbb2e6329d"
+  },
+  "olmo-7b-0724:train": {
+    "bytes": 16837800,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/olmo-7b-0724/2cc74a7ff217febe.pt",
+    "sha256": "f85acaa60c2510330637b1d6b627c6a408cd038d9886f34741788cdaaf4e8070"
+  },
+  "olmo-7b-0724:val": {
+    "bytes": 8419752,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/olmo-7b-0724/05418026c419939a.pt",
+    "sha256": "51b8cd8cb2d8d8c67353b7812a224d00863d2710b7f5935300bd40f7ca6126b0"
+  },
+  "olmo2-1124-7b:test": {
+    "bytes": 8419688,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/olmo2-1124-7b/d3be6671c0676b8b.pt",
+    "sha256": "1f8743363a4cca987a1f28a42538bcae5787e88f5bf08e0ca8a180ff797849f1"
+  },
+  "olmo2-1124-7b:train": {
+    "bytes": 16837800,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/olmo2-1124-7b/5e7ac0d7ed6c20f1.pt",
+    "sha256": "280ff90003b9850a1cd3217dad7be92269a44017241ae5276dcbeb412ea85486"
+  },
+  "olmo2-1124-7b:val": {
+    "bytes": 8419752,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/olmo2-1124-7b/6c423077ca7e203a.pt",
+    "sha256": "1d5194004e2e7ed2bfec2f8520d7508d0d5f74d81c58180150c0835beca3d7d6"
+  },
+  "qwen2-7b:test": {
+    "bytes": 7371112,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/qwen2-7b/50e52a91e970ef0c.pt",
+    "sha256": "ebbb3aae53c85f3ef7504610fb089f918c3600dc779fe92af0676ca6b33298ce"
+  },
+  "qwen2-7b:train": {
+    "bytes": 14740648,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/qwen2-7b/aa43baf3a462fa4f.pt",
+    "sha256": "1cbca848cc21cabb8e6eefc03594fcc5d7c6c421f8b5f4aab8a5ced2d814c83c"
+  },
+  "qwen2-7b:val": {
+    "bytes": 7371176,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/qwen2-7b/540c9b60c8a6bb98.pt",
+    "sha256": "eaa011661781ad404def2228642b5907911ee4cf7361f2e708a0e6713e5cdb49"
+  },
+  "qwen2.5-7b:test": {
+    "bytes": 7371112,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/qwen2.5-7b/4df9a2e180b466ab.pt",
+    "sha256": "7f3cfd1277f1d0e4a206843340fa93f2e2a3db9dd27f3c8f26f6503c75f0e6bb"
+  },
+  "qwen2.5-7b:train": {
+    "bytes": 14740648,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/qwen2.5-7b/f478317a5cf83156.pt",
+    "sha256": "7afe4966f771e24f882e2bc0164639c7de7bb0cc65d39f9aeb06866219a6c5e9"
+  },
+  "qwen2.5-7b:val": {
+    "bytes": 7371176,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/qwen2.5-7b/bc42a9a8ab745202.pt",
+    "sha256": "eae06ff4bd05edef18c3abb88ecbb90e04d03e4a59023f44e9c96b4809fdcd81"
+  },
+  "qwen3-4b-instruct-2507:test": {
+    "bytes": 5273960,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/qwen3-4b-instruct-2507/ebaaead0f02c9621.pt",
+    "sha256": "a17d9465711d6e51b45851ec33e538af60ea8b6693a6110e2b620f54e33dd63b"
+  },
+  "qwen3-4b-instruct-2507:train": {
+    "bytes": 10546344,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/qwen3-4b-instruct-2507/850667fcf95c3c1f.pt",
+    "sha256": "205bc73454702b1963651cd1c19d3023289e9b94149bbdbc587cb40547f4d5a8"
+  },
+  "qwen3-4b-instruct-2507:val": {
+    "bytes": 5274024,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/qwen3-4b-instruct-2507/cd5faba31706d958.pt",
+    "sha256": "39080ff3e0c4cb0659a2ec2c1010735c426f616c172edd1f16696670ee53ae03"
+  },
+  "qwen3-4b:test": {
+    "bytes": 5273960,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/qwen3-4b/ddd7fa0443a83241.pt",
+    "sha256": "9e0220207648a714584c63ba9b2f1250a075a9ed802d4c1b43b2d11a23550ff1"
+  },
+  "qwen3-4b:train": {
+    "bytes": 10546344,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/qwen3-4b/1c5b4adb9e3ffbf1.pt",
+    "sha256": "a32ff2052526fb3efeaaff1a00044b43282a099c0d76f9640e4b69dfe4c7e543"
+  },
+  "qwen3-4b:val": {
+    "bytes": 5274024,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/qwen3-4b/62802fcfa547d200.pt",
+    "sha256": "4b1901e3abf4b775dac7b90482d134d023d1b5b308cca5006102f4953434bed8"
+  },
+  "qwen3-8b-base:test": {
+    "bytes": 8419688,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/qwen3-8b-base/7b2a7312c82f8e99.pt",
+    "sha256": "a2e0c10134c2fb4afc67642eda53d02cfc85d6fd24f06ab8865ad9fc24548ed0"
+  },
+  "qwen3-8b-base:train": {
+    "bytes": 16837800,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/qwen3-8b-base/740b2b0633def1fc.pt",
+    "sha256": "8e6ed78b7c97df61a5f1ca1811f1aae1f841ddc78b6357e018f8ffd6179a5413"
+  },
+  "qwen3-8b-base:val": {
+    "bytes": 8419752,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/qwen3-8b-base/ea76be26285bbf32.pt",
+    "sha256": "a3a71c752e52e8ad9cfe177f37d2a28bbfc9189f1ef73c0c7929b23f93f862fb"
+  },
+  "qwen3.5-4b:test": {
+    "bytes": 5273960,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/qwen3.5-4b/c745ecc299096544.pt",
+    "sha256": "b156e7bc6dbeb5abf245f335d8f945431c97986f2ab3f9457d8a3f0522aed852"
+  },
+  "qwen3.5-4b:train": {
+    "bytes": 10546344,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/qwen3.5-4b/b635597e89ea2490.pt",
+    "sha256": "070e967362a5449fc3e11ad2fe595d8fcc7cce8321c19a39614642a4043d58fd"
+  },
+  "qwen3.5-4b:val": {
+    "bytes": 5274024,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/qwen3.5-4b/ddf33a748a54b7c3.pt",
+    "sha256": "63dc65e7b986ff6e801e66717d88e271fe7a995d3545d62062211ce049082697"
+  },
+  "vit-in21k-small:test": {
+    "bytes": 817320,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/test/vit-in21k-small/63a904538e286319.pt",
+    "sha256": "a6de8a9d13d30fd179a33ac4de81e779b40131092f87e99092300341d60e4c70"
+  },
+  "vit-in21k-small:train": {
+    "bytes": 1633256,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/train/vit-in21k-small/374927e6da57268c.pt",
+    "sha256": "e9ab7caa6b29ee024de96cddda8b1b73c7af0be08537679a3d35c23e4ac1f1d2"
+  },
+  "vit-in21k-small:val": {
+    "bytes": 817384,
+    "path": "/mnt/sdb1/prh-replication-work/features/coco_val2017_final_block_pre_norm/val/vit-in21k-small/79e8998dd75ec5d9.pt",
+    "sha256": "e55d998fc679bb4bb637edf4c0c19fa69f341172f0ae2389a024bbbca5da2dc5"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "clip-laion-base": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.41925844859522776,
+    "recomputed": 0.41925844859522776
+  },
+  "dinov2-small": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.36599953954758085,
+    "recomputed": 0.36599953954758085
+  },
+  "olmo-3-1025-7b": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.4836144362154144,
+    "recomputed": 0.4836144362154144
+  },
+  "olmo-7b-0724": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.5210834775307428,
+    "recomputed": 0.5210834775307428
+  },
+  "olmo2-1124-7b": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.47979850943467,
+    "recomputed": 0.47979850943467
+  },
+  "qwen2-7b": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.6025477974096685,
+    "recomputed": 0.6025477974096685
+  },
+  "qwen2.5-7b": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.6385594359312395,
+    "recomputed": 0.6385594359312395
+  },
+  "qwen3-4b": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.5341613083875996,
+    "recomputed": 0.5341613083875996
+  },
+  "qwen3-4b-instruct-2507": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.5816541805496945,
+    "recomputed": 0.5816541805496945
+  },
+  "qwen3-8b-base": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.4770375246397047,
+    "recomputed": 0.4770375246397047
+  },
+  "qwen3.5-4b": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.5880946971064425,
+    "recomputed": 0.5880946971064425
+  },
+  "vit-in21k-small": {
+    "abs_diff": 0.0,
+    "parent_variance_fraction": 0.35380499775561003,
+    "recomputed": 0.35380499775561003
+  }
+}

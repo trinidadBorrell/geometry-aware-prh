@@ -1,0 +1,24 @@
+{
+  "name": "prh_released_code",
+  "label": "PRH released-code protocol on COCO",
+  "operational_reference": "minyoungg/platonic-rep@dcd76ba extract_features.py + measure_alignment.py",
+  "paper": "arXiv:2405.07987",
+  "dataset": "coco_val2017 test split n=1024 (WIT-1024 unavailable)",
+  "caption": "COCO original English caption with minimum annotation id",
+  "gallery_size": 1024,
+  "mknn_k": 10,
+  "clip_q": 0.95,
+  "clip_then_l2": true,
+  "layer_selection": "max over all stored layers independently per metric",
+  "concat_features": "not in primary protocol; optional paper Appendix C extra on caches",
+  "rbf_sigma": 1.0,
+  "rbf_sigma_note": "official AlignmentMetrics.cka default; same sigma both sides; not train-median multipliers",
+  "shuffles": {
+    "fixed_layer": "one-sided permutation of already selected layers; sanity ~ k/(n-1)",
+    "selection_aware": "same permutation reused across all layer candidates; null for the max statistic"
+  },
+  "not_this_config": [
+    "results/modern (supplementary modified protocol)",
+    "results/original RBF at median×{0.5,1,2}"
+  ]
+}

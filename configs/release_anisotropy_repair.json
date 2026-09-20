@@ -1,0 +1,42 @@
+{
+  "name": "release_anisotropy_repair_v1",
+  "label": "Bounded optimiser repair: nested incumbents, S-tilde, orientation reference",
+  "parent_results": "results/release_anisotropy",
+  "evaluation_status": "exploratory",
+  "do_not_modify": [
+    "results/original",
+    "results/modern",
+    "results/prh_released_code",
+    "results/learned_kernels",
+    "results/flex_kernels",
+    "results/anisotropic_kernels",
+    "results/release_anisotropy"
+  ],
+  "objective": "CKA excess a-b; rho is an upper bound, not an equality",
+  "q": 32,
+  "eig_bounds": [0.25, 4.0],
+  "budgets_rho": [0.0, 0.1, 0.4, 1.0, 1.921812055672805],
+  "repair": {
+    "retain_incumbents": true,
+    "warm_start_continuation": true,
+    "best_iterate_including_zero": true,
+    "no_vech_clamp": true,
+    "skip_backward_if_no_grad": true
+  },
+  "orientation_reference": {"n_rotations": 50, "seed": 20260921},
+  "shuffle": {
+    "models": ["qwen2-7b", "qwen3-8b-base", "olmo-7b-0724", "olmo-3-1025-7b"],
+    "partner": "dinov2-small",
+    "seeds": [0, 1, 2]
+  },
+  "stability": {
+    "models": ["qwen2-7b", "qwen3-8b-base", "olmo-7b-0724", "olmo-3-1025-7b"],
+    "partners": ["dinov2-small", "vit-in21k-small", "clip-laion-base"],
+    "subsets": 3,
+    "subset_size": 682,
+    "subset_seed": 7,
+    "rho_fixed": 0.1
+  },
+  "two_sided": "retain parent results/release_anisotropy/two_sided.json (not a nested-budget grid)",
+  "native": "reuse parent native_matrix.json and native_anisotropy.json after provenance check"
+}

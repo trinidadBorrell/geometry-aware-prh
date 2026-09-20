@@ -1,0 +1,32 @@
+{
+  "all_d_le_rho": true,
+  "direct_vs_contracted": [
+    {
+      "abs_diff": 2.266603739597972e-05,
+      "contracted_a": 0.6631125389416435,
+      "direct_a": 0.6631352049790394,
+      "ok": false,
+      "pair": "olmo-3-1025-7b__clip-laion-base",
+      "rho": 1.921812055672805
+    },
+    {
+      "abs_diff": 1.9454977932653605e-05,
+      "contracted_a": 0.5136203103983163,
+      "direct_a": 0.513639765376249,
+      "ok": false,
+      "pair": "olmo-3-1025-7b__dinov2-small",
+      "rho": 1.0
+    },
+    {
+      "abs_diff": 2.1424956916371585e-05,
+      "contracted_a": 0.8922800614885501,
+      "direct_a": 0.8923014864454665,
+      "ok": false,
+      "pair": "olmo-3-1025-7b__olmo-7b-0724",
+      "rho": 1.0
+    }
+  ],
+  "identity_rho0": true,
+  "rho_is_upper_bound": true,
+  "train_monotonicity_failures": 0
+}

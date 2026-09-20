@@ -1,0 +1,42 @@
+{
+  "cause": "Implementation, not nonconvexity of the feasible set. Each rho ran independent Adam (identity + two perturbations) and scored only the final iterate. Identity starts abort when torch.linalg.eigh of S=0 (repeated eigenvalues) yields obj.requires_grad False. At large rho the perturbation last-iterates scored below identity, so identity_explicit won. Nested feasible sets were never searched: a feasible rho=0.1 S was not a candidate at larger rho, and no best-iterate/incumbent was kept. params.clamp(-4,4) on vech is not D<=rho; project_S already enforces spectral clip then Frobenius scale. rho is an upper bound (scale only if D>rho), not an equality and not a change of objective. Two-sided bridge uses a single spectral-clip fit_metrics (no nested rho grid) and already retained non-identity solutions; it is not recomputed.",
+  "parent_train_excess_rho01": 0.31477409866475914,
+  "reeval": {
+    "0.0": {
+      "d": 0.0,
+      "eig_ok": true,
+      "excess_matches_01": false,
+      "feasible": true,
+      "train_excess": 0.169960174991514
+    },
+    "0.1": {
+      "d": 0.0999999999999999,
+      "eig_ok": true,
+      "excess_matches_01": true,
+      "feasible": true,
+      "train_excess": 0.31477409866475914
+    },
+    "0.4": {
+      "d": 0.09999999999999999,
+      "eig_ok": true,
+      "excess_matches_01": true,
+      "feasible": true,
+      "train_excess": 0.31477409866475914
+    },
+    "1.0": {
+      "d": 0.09999999999999999,
+      "eig_ok": true,
+      "excess_matches_01": true,
+      "feasible": true,
+      "train_excess": 0.31477409866475914
+    },
+    "1.921812055672805": {
+      "d": 0.09999999999999999,
+      "eig_ok": true,
+      "excess_matches_01": true,
+      "feasible": true,
+      "train_excess": 0.31477409866475914
+    }
+  },
+  "sample_pair": "qwen2-7b__dinov2-small"
+}

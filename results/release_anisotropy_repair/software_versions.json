@@ -1,0 +1,9 @@
+{
+  "command": "python scripts/run_release_anisotropy_repair.py --work /mnt/sdb1/prh-replication-work",
+  "git_head": null,
+  "numpy": "2.2.0",
+  "platform": "Linux-6.14.0-24-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "torch": "2.10.0+cu128",
+  "transformers": "5.3.0"
+}

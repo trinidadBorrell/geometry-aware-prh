@@ -1,0 +1,18 @@
+{
+  "evaluation_status": "exploratory",
+  "n_train_mono_fail": 0,
+  "n_vision_stilde_defined_rho01": 27,
+  "native_reused": true,
+  "parent": "release_anisotropy",
+  "shuffle_mean_delta_a": -0.02703082993043145,
+  "shuffle_n_identity": 2,
+  "transfer_vl_rho01_delta_excess": 0.047310678402650304,
+  "transfer_vl_rho01_uniform_delta": -0.00012491936278593056,
+  "two_sided_retained": true,
+  "vision_stilde_cosine_rho01_defined": 0.7940433252815052,
+  "vl_headline_mean_delta_a": 0.1678509563075871,
+  "vl_identity_mean_a": 0.378514120089606,
+  "vl_maxrho_mean_a": 0.5464495392951426,
+  "vl_maxrho_mean_d": 0.8113816811052017,
+  "vl_rho01_mean_a": 0.5062694003148448
+}

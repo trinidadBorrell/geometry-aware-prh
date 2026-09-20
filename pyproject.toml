@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prh-replication"
+version = "0.1.0"
+description = "Bounded replication of Platonic Representation Hypothesis alignment baselines"
+requires-python = ">=3.10"
+dependencies = [
+  "torch",
+  "numpy",
+  "pillow",
+  "tqdm",
+  "matplotlib",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+extract = [
+  "transformers>=4.44",
+  "timm",
+  "huggingface_hub",
+  "safetensors",
+]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

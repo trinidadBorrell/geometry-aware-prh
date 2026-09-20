@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+.mypy_cache/
+
+# Large local/host caches (kept on /mnt/sdb1)
+work/
+data/raw/
+data/cache/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# Keep small result tables and plots
+!results/**/*.json
+!results/**/*.csv
+!results/**/*.md
+!results/**/*.png

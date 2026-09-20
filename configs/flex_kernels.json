@@ -1,0 +1,41 @@
+{
+  "name": "flex_kernels_v1",
+  "label": "Polynomial, spherical-harmonic, and Fourier mixture kernels on frozen PRH layers",
+  "parent": "results/learned_kernels",
+  "do_not_modify": ["results/original", "results/modern", "results/prh_released_code", "results/learned_kernels"],
+  "evaluation_status": "exploratory",
+  "layers": "reuse results/learned_kernels/layers.json (train max linear CKA)",
+  "distance_scales": "reuse results/learned_kernels/selections.json train_scales",
+  "P": 12,
+  "nu_grid": [0.1, 0.14893891324883998, 0.2218279987974549, 0.3303882106905792, 0.4920766105048365, 0.7328935560376306, 1.0915636976332257, 1.6257631086737803, 2.4213939060592855, 3.6063977691583373, 5.371329644814837, 8.0],
+  "nu_construction": "10 ** linspace(-1, log10(8), 12); last entry snapped to 8",
+  "d_ref_profiles": 1024,
+  "s_ref": 1.0,
+  "s_ref_note": "Frozen from previous experiment typical train median distances (~0.82–1.05). Canonical profile comparison only.",
+  "families": {
+    "monomial": "w_p t^p, p=1..P, simplex, linear is p=1",
+    "spherical": "shared harmonic-order weights on Z_{p,d_A} and Z_{p,d_B}",
+    "lin_fourier": "linear plus 12 spectral shells",
+    "sph_fourier": "spherical p=1..P plus 12 spectral shells; linear is p=1 once"
+  },
+  "regularisers": {
+    "unreg": {"lam_nl": 0.0, "lam_complexity": 0.0, "lam_smooth": 0.0},
+    "nl": {"lam_nl": 1.0, "lam_complexity": 0.0, "lam_smooth": 0.0},
+    "moderate": {"lam_nl": 0.5, "lam_complexity": 0.5, "lam_smooth": 0.25},
+    "strong": {"lam_nl": 2.0, "lam_complexity": 2.0, "lam_smooth": 1.0}
+  },
+  "penalty": "R = lam_nl*(1-c_lin) + lam_complexity*(poly_degree_cost + fourier_freq_cost) + lam_smooth*sum (Delta c_fourier)^2. Polynomial families omit Fourier terms. lin_fourier omits poly degree cost.",
+  "objectives": ["ratio", "excess"],
+  "objective_scaling": "maximize J(c)/J(linear) - R(c) on train; skip fit if J(linear)<=1e-8",
+  "reg_selection": "per pair, per family, per objective: argmax unpenalised validation J",
+  "family_choice": "report each family separately; optional val-mean ranking is not used to drop families from eval",
+  "starts": ["linear_vertex", "uniform", "best_vertex", "dirichlet_0", "dirichlet_1", "dirichlet_2"],
+  "hyp0f1": "power series for |z|<80; Gaussian high-d limit exp(-nu^2 r^2 / 2) otherwise; record fallback fraction",
+  "shuffle_pairs": [["bloomz-560m", "dinov2-small"], ["qwen3-0.6b-base", "clip-laion-base"], ["olmo-1b-0724", "vit-in21k-small"]],
+  "shuffle_seeds": [0, 1],
+  "stability_subsets": 3,
+  "subset_size": 682,
+  "subset_seed": 7,
+  "n_perm_eval": 100,
+  "cka_abs_diagnostic_family": "monomial_unreg_only"
+}

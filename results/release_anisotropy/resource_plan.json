@@ -1,0 +1,27 @@
+{
+  "cache_plan": {
+    "language": "new caches only; do not reuse all-hidden_states stacks",
+    "reuse_rule": "revision, layer, pooling, clip+L2 protocol must match",
+    "vision": "reuse last CLS from existing original-protocol caches; rewrite into coco_val2017_final_block_pre_norm/"
+  },
+  "checkpointing": "per-model extract_status.json; per-pair onesided_fits/*.json",
+  "do_not_evict": "vllm-akkadian.service",
+  "estimated_weight_gb": "~15GB x six 7B/8B + ~8GB x three 4B",
+  "evaluation_status": "exploratory",
+  "extraction_device": {
+    "extraction_device": "GPU bf16/fp16 after stopping vllm-akkadian (user request 2026-09-20); sequential, resumable",
+    "feature_disk_gb": "<2 (final layer only, n=2048+1024+1024)",
+    "gpu_free_at_plan": "7.4 GB leftover (vLLM resident); 7B/8B will not fit without eviction",
+    "wallclock_extract_hours": "order 10\u201320 on CPU if all nine complete",
+    "weight_disk_gb": "~120 for nine LMs"
+  },
+  "gallery": "same test n for every comparison",
+  "n_language_models": 9,
+  "n_per_split": {
+    "test": 1024,
+    "train": 2048,
+    "val": 1024
+  },
+  "primary_objective": "CKA excess a-b; documented before inspecting new test results",
+  "protocol": "final_block_pre_norm"
+}
