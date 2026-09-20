@@ -147,3 +147,18 @@ ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && WORKERS=16 nohup bash in
 Outputs (`/workspace/results/oddharak/prh_val/`): `cross_modal.npz/json` (10 LLMs x 17 ViTs, 15
 metrics), `vision_vision.npz/json`, `figures/` (PRH Fig. 3, 10, 12, 13, 14). Each worker needs
 ~3 GB RAM; size `WORKERS` by memory, not `nproc` (pods report host cores).
+
+## Null-calibrated alignment (Groger et al.)
+
+`geoprh.prh_calibration` wraps Aristotelian's permutation calibration of the max-over-layers
+score and writes `prh_alignment*.npy` payloads that Aristotelian's own plotting reads
+unchanged (raw vs calibrated per vision family, tau thresholds, p-values, BH-FDR):
+
+```bash
+ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && PERMUTATIONS=200 nohup bash infra/runpod/run_prh_calibration.sh > /workspace/results/oddharak/prh_calibration.log 2>&1 &"
+# figures only, from existing payloads:
+cd Aristotelian && uv run python -m scripts.plots.experiments --sections prh_alignment --assets-dir <dir>
+```
+
+Rows are padded to the full 12-LLM `val` list (NaN where activations are missing) so the
+upstream labels line up. Outputs: `/workspace/results/oddharak/prh_val_calibrated/`.
