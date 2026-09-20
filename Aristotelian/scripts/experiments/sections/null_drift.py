@@ -175,7 +175,7 @@ def run_null_drift_gaussian(
     seed: int | None,
     num_workers: int = 1,
     start_method: str | None = None,
-    quick_test: bool = False,
+    quick_test: bool = True,
 ) -> None:
     """Run null drift experiment with Gaussian noise.
 
