@@ -331,6 +331,8 @@ def run_null_drift_gaussian(
             results = []
             for entry in tqdm(args, desc=f"Null drift {metric_name}"):
                 results.append(_process_null_drift_nd_combination(*entry))
+                if device.startswith("cuda"):
+                    torch.cuda.empty_cache()
 
             idx = 0
             for i in range(len(n_list)):
@@ -518,7 +520,12 @@ def run_null_drift_heavy(
                             dist = torch.distributions.StudentT(df=3)
                             X = dist.sample((n, d)).to(device)
                             Y = dist.sample((n, d)).to(device)
-                            scores_raw.append(fn_raw(X, Y))
+                            raw_score = fn_raw(X, Y)
+                            scores_raw.append(
+                                float(raw_score)
+                                if not isinstance(raw_score, float)
+                                else raw_score
+                            )
                             if fn_gated is not None:
                                 if metric_name in multiq_helpers:
                                     res = multiq_helpers[metric_name](
@@ -529,16 +536,20 @@ def run_null_drift_heavy(
                                         device=device,
                                     )
                                     for q in quantiles:
-                                        scores_q[q].append(res["gated"][q])
+                                        scores_q[q].append(float(res["gated"][q]))
                                     scores_variants["null_centered"].append(
-                                        res["variants"].null_centered
+                                        float(res["variants"].null_centered)
                                     )
-                                    scores_variants["z"].append(res["variants"].z)
-                                    scores_variants["ari"].append(res["variants"].ari)
+                                    scores_variants["z"].append(
+                                        float(res["variants"].z)
+                                    )
+                                    scores_variants["ari"].append(
+                                        float(res["variants"].ari)
+                                    )
                                 else:
                                     for q in quantiles:
                                         res = fn_gated(X, Y, q)
-                                        scores_q[q].append(res.gated)
+                                        scores_q[q].append(float(res.gated))
                         vals_heavy[(metric_name, "raw")][i, j] = np.mean(scores_raw)
                         if fn_gated is not None:
                             for q in quantiles:
@@ -555,6 +566,9 @@ def run_null_drift_heavy(
                                 vals_heavy[(metric_name, "ari")][i, j] = np.mean(
                                     scores_variants["ari"]
                                 )
+                        del X, Y
+                        if device.startswith("cuda"):
+                            torch.cuda.empty_cache()
 
                 # Save checkpoint after each metric
                 completed_metrics.add(metric_name)
