@@ -383,8 +383,11 @@ def run_null_drift_heavy(
         logger.info(f"Skipping null_drift_heavy (output exists: {output})")
         return
 
-    n_list = [128, 256, 512, 1024, 2048, 4096]
-    d_list = [128, 256, 512, 1024, 2048]
+    # n_list = [128, 256, 512, 1024, 2048, 4096]
+    # d_list = [128, 256, 512, 1024, 2048]
+
+    n_list = [64, 128]
+    d_list = [64, 128]
     trials = 50
     quantiles = [0.90, 0.95]
     num_permutations = 200
