@@ -17,4 +17,3 @@ data/cache/
 
 # Generated experiment outputs (work disk is authoritative)
 results/*
-!results/README.md

@@ -124,7 +124,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     if (out / "summary.json").exists() and not args.force and not args.smoke:
         print("release_anisotropy already complete; pass --force to rerun", flush=True)
-        print("Parent one-sided fits are superseded; see FREEZE.md and run_release_anisotropy_repair.py", flush=True)
+        print("Parent one-sided fits are superseded; see README.md and run_release_anisotropy_repair.py", flush=True)
         return
     if args.force:
         print(ARCHIVE_MSG, flush=True)
