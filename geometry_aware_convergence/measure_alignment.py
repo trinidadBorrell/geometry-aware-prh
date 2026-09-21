@@ -30,7 +30,7 @@ def prepare_features(feats, q=0.95, exact=False):
         raise ValueError(f"Unsupported input type for prepare_features: {type(feats)}")
 
 
-def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, normalize=True):
+def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, normalize=True, null_calibration=False, num_permutations=200, quantile=0.95):
     """
     Uses different layer combinations of x_feats and y_feats to find the best alignment
     Args:
@@ -67,10 +67,21 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, normalize=True
             if score > best_alignment_score:
                 best_alignment_score = score
                 best_alignment_indices = (i, j)
+    if null_calibration:
+        i, j = best_alignment_indices
+        x, y = x_feats[i], y_feats[j]
+
+        if normalize:
+            x_aligned = F.normalize(x, p=2, dim=-1)
+            y_aligned = F.normalize(y, p=2, dim=-1)
+        else:
+            x_aligned = x
+            y_aligned = y
+        best_alignment_score = metrics.null_calibrate(metric, x_aligned, y_aligned, topk=topk, num_permutations=num_permutations, quantile=quantile)['gated']
     return best_alignment_score, best_alignment_indices
 
     
-def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, precise=True):
+def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, null_calibration, num_permutations, quantile, precise=True):
     """
     Args:
         x_feat_paths: list of paths to x features
@@ -116,7 +127,13 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, precise=True):
                 y_feats = prepare_features(raw_y.float(), exact=precise)
             else:
                 y_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_y]
-            best_score, best_indices = compute_score(y_feats, x_feats, metric=metric, topk=topk)
+            best_score, best_indices = compute_score(
+                y_feats, x_feats,
+                metric=metric, topk=topk,
+                null_calibration=null_calibration, 
+                num_permutations=num_permutations,
+                quantile=quantile
+            )
             
             alignment_scores[i, j] = best_score
             alignment_indices[i, j] = best_indices
@@ -145,7 +162,9 @@ def to_feature_filename(input_dir, modality, model_name):
     return save_path
 
 
-def to_alignment_filename(output_dir, metric, topk):
+def to_alignment_filename(output_dir, metric, topk, null_calibrate):
+    if null_calibrate:
+        metric += "_NC"
     save_path = os.path.join(
         output_dir,
         f"{metric}_k{topk}.npy" if 'knn' in metric else f"{metric}.npy"
@@ -174,6 +193,8 @@ if __name__ == "__main__":
     parser.add_argument("--force_remake",   action="store_true")
 
     parser.add_argument("--null-calibrate", action="store_true")
+    parser.add_argument("--num-permutations", type=int, default=200)
+    parser.add_argument("--quantile", type=float, default=0.95)
 
     args = parser.parse_args()
     
@@ -183,7 +204,7 @@ if __name__ == "__main__":
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
     
-    save_path = to_alignment_filename(args.output_dir, args.metric, args.topk)
+    save_path = to_alignment_filename(args.output_dir, args.metric, args.topk, args.null_calibrate)
     
     if os.path.exists(save_path) and not args.force_remake:
         print(f"alignment already exists at {save_path}")
@@ -218,7 +239,7 @@ if __name__ == "__main__":
     pprint(models_y_paths)
     
     print('\nmeasuring alignment')
-    alignment_scores, alignment_indices = compute_alignment(models_x_paths, models_y_paths, args.metric, args.topk, args.precise)
+    alignment_scores, alignment_indices = compute_alignment(models_x_paths, models_y_paths, args.metric, args.topk, args.null_calibrate, args.num_permutations, args.quantile, args.precise)
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     np.save(save_path, {"scores": alignment_scores, "indices": alignment_indices})
