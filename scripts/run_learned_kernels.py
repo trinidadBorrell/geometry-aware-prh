@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from prh_replication.datasets import load_manifest
-from prh_replication.io_utils import write_json
+from prh_replication.io_utils import skip_if_complete, write_json
 from prh_replication.kernel_experiment import (
     FAMILIES,
     LANG_KEYS,
@@ -84,6 +84,7 @@ def parse_args():
     p.add_argument("--skip-hooks", action="store_true")
     p.add_argument("--n-perm", type=int, default=100)
     p.add_argument("--pairs-limit", type=int, default=0)
+    p.add_argument("--force", action="store_true")
     return p.parse_args()
 
 
@@ -92,6 +93,8 @@ def main():
     paths = Paths(work=Path(args.work), repo=ROOT)
     out = paths.results / "learned_kernels"
     out.mkdir(parents=True, exist_ok=True)
+    if skip_if_complete(out, force=args.force, smoke=args.smoke):
+        return
     repo_out = ROOT / "results" / "learned_kernels"
     repo_out.mkdir(parents=True, exist_ok=True)
     design = json.loads((ROOT / "configs" / "learned_kernels.json").read_text())

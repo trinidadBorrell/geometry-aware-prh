@@ -10,7 +10,7 @@ from typing import Any
 import torch
 
 from prh_replication.extract import feature_path
-from prh_replication.io_utils import load_features, write_json
+from prh_replication.io_utils import jsonable, load_features, write_json
 from prh_replication.kernels import (
     ALPHA_GRID,
     LAMBDA_GRID,
@@ -267,15 +267,3 @@ def share_tag(src: tuple[str, str], tgt: tuple[str, str]) -> str:
     if share_v:
         return "shared_vision"
     return "neither"
-
-
-def jsonable(x):
-    if isinstance(x, float) and (math.isnan(x) or math.isinf(x)):
-        return None
-    if isinstance(x, dict):
-        return {k: jsonable(v) for k, v in x.items()}
-    if isinstance(x, (list, tuple)):
-        return [jsonable(v) for v in x]
-    if isinstance(x, torch.Tensor):
-        return x.tolist()
-    return x

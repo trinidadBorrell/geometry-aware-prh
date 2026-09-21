@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from prh_replication.extract import feature_path
-from prh_replication.io_utils import load_features, write_json
+from prh_replication.io_utils import load_features, skip_if_complete, write_json
 from prh_replication.metrics import linear_cka, mutual_knn_score
 from prh_replication.plots import bars, heatmap, lines
 from prh_replication.prh_ref import (
@@ -157,6 +157,7 @@ def main():
     p.add_argument("--concat", action="store_true")
     p.add_argument("--cka-sel-null", action="store_true")
     p.add_argument("--pairs-limit", type=int, default=0)
+    p.add_argument("--force", action="store_true")
     args = p.parse_args()
 
     # rebuild a fake run_phase1 args
@@ -169,9 +170,12 @@ def main():
 
     a = A()
     paths = Paths(work=Path(args.work), repo=ROOT)
+    out_root = paths.results / "prh_released_code"
+    out_root.mkdir(parents=True, exist_ok=True)
+    if skip_if_complete(out_root, force=args.force):
+        return
     keys = rp.selected_models(a)
     keys = [k for k in keys if rp._load(paths, k, "test", a) is not None]
-    out_root = paths.results / "prh_released_code"
     pair_rows = []
     combos = list(combinations(keys, 2))
     if args.pairs_limit:

@@ -40,10 +40,9 @@ from prh_replication.anisotropic_kernels import (
     truncation_gram,
 )
 from prh_replication.datasets import load_manifest
-from prh_replication.io_utils import write_json
+from prh_replication.io_utils import jsonable, skip_if_complete, write_json
 from prh_replication.kernel_experiment import (
     frozen_xy,
-    jsonable as _jsonable,
     load_split_features,
     pair_name,
     prepared_layers,
@@ -51,17 +50,9 @@ from prh_replication.kernel_experiment import (
     vl_pairs,
 )
 from prh_replication.kernels import center_gram_o2, extension_stats, linear_gram, mc_cka_mean
-from prh_replication.metrics import mutual_knn_score, nearest_neighbors
+from prh_replication.metrics import mutual_knn_score
 from prh_replication.plots import lines
 from prh_replication.registry import Paths
-
-
-def jsonable(x):
-    if isinstance(x, np.ndarray):
-        return jsonable(x.tolist())
-    if isinstance(x, np.generic):
-        return x.item()
-    return _jsonable(x)
 
 
 def parse_args():
@@ -70,6 +61,7 @@ def parse_args():
     p.add_argument("--smoke", action="store_true")
     p.add_argument("--n-perm", type=int, default=40)
     p.add_argument("--pairs-limit", type=int, default=0)
+    p.add_argument("--force", action="store_true")
     return p.parse_args()
 
 
@@ -144,6 +136,8 @@ def main():
     paths = Paths(work=Path(args.work), repo=ROOT)
     out = paths.results / "anisotropic_kernels"
     out.mkdir(parents=True, exist_ok=True)
+    if skip_if_complete(out, force=args.force, smoke=args.smoke):
+        return
     design = json.loads((ROOT / "configs" / "anisotropic_kernels.json").read_text())
     write_json(out / "design.json", design)
 

@@ -207,3 +207,32 @@ def test_haar_preserves_spectrum_and_distortion():
     assert np.allclose(np.sort(np.linalg.eigvalsh(s)), np.sort(np.linalg.eigvalsh(sr)), atol=1e-10)
     assert distortion_d(s, 6) == pytest.approx(distortion_d(sr, 6), rel=1e-12, abs=1e-12)
 
+
+def test_direct_vs_contracted_precision_gap():
+    """Ambient Gram CKA (float32 extension_stats) vs float64 contractions.
+
+    Frozen repair checks saw ~2e-5. Do not treat 1e-6 as a contract.
+    """
+    from prh_replication.release_protocol import eval_onesided
+
+    g = torch.Generator().manual_seed(10)
+    xa = F.normalize(torch.randn(24, 10, generator=g), dim=-1).numpy().astype(np.float64)
+    xb = F.normalize(torch.as_tensor(xa[:, :8]) + 0.05 * torch.randn(24, 8, generator=g), dim=-1).numpy()
+    za, zb = xa - xa.mean(0), xb - xb.mean(0)
+    ua, ub = fit_pca(za, q=4)["U"], fit_pca(zb, q=4)["U"]
+    pack = make_pack(za, zb, ua, ub)
+    ba = np.eye(4)
+    contracted = scores_numpy(ba - np.eye(4), np.zeros((pack["q_b"], pack["q_b"])), pack)
+    direct = eval_onesided(za, zb, ua, ub, ba, n_perm=0, seed=0)
+    assert abs(contracted["a"] - direct["a"]) < 5e-5
+
+
+def test_skip_if_complete(tmp_path):
+    from prh_replication.io_utils import skip_if_complete
+
+    assert skip_if_complete(tmp_path) is False
+    (tmp_path / "summary.json").write_text("{}")
+    assert skip_if_complete(tmp_path) is True
+    assert skip_if_complete(tmp_path, force=True) is False
+
+

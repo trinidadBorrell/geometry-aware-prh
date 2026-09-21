@@ -2,23 +2,20 @@
 """Checksum inventory for the release-alignment freeze (work disk)."""
 from __future__ import annotations
 
-import hashlib
 import json
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from prh_replication.io_utils import sha256_file
 
 WORK = Path("/mnt/sdb1/prh-replication-work")
 REPAIR = WORK / "results" / "release_anisotropy_repair"
 PARENT = WORK / "results" / "release_anisotropy"
 OUT = WORK / "freeze" / "prh-release-alignment-freeze-20260921"
 SNAPSHOT_ID = "prh-release-alignment-freeze-20260921"
-
-
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def rec(path: Path, role: str, status: str) -> dict:

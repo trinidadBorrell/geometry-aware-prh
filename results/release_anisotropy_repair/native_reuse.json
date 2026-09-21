@@ -1,7 +1,0 @@
-{
-  "native_anisotropy": "/mnt/sdb1/prh-replication-work/results/release_anisotropy/native_anisotropy.json",
-  "native_matrix": "/mnt/sdb1/prh-replication-work/results/release_anisotropy/native_matrix.json",
-  "native_sha256": "b4f3500723a0d7c52dd0d375d8cd7d72b5f918acc2926138023065e1006c4063",
-  "two_sided": "/mnt/sdb1/prh-replication-work/results/release_anisotropy/two_sided.json",
-  "two_sided_note": "Two-sided bridge is a single max-budget spectral-clip fit, not a nested rho grid. Original run found non-identity solutions; not recomputed."
-}

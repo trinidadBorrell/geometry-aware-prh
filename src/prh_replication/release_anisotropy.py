@@ -397,7 +397,8 @@ def fit_one_sided(
                 torch.nn.utils.clip_grad_norm_([params], 5.0)
                 opt.step()
             else:
-                # Repeated-eigenvalue / disconnected graph at identity: do not discard the point.
+                # Degenerate eigh at S=0 (and/or constant torch.where branches)
+                # can yield excess.requires_grad False; keep the iterate already scored.
                 break
             rec_s = evaluate_one_sided_vech(pack, params.detach(), rho)
             rec_s["start"] = f"{name}_iter{step + 1}"

@@ -8,15 +8,12 @@ overwrite results/release_anisotropy/.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import platform
 import shutil
 import subprocess
 import sys
-import time
-from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -24,16 +21,14 @@ import torch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-sys.path.insert(0, str(ROOT / "scripts"))
-
-import run_release_anisotropy as ra  # noqa: E402
 
 from prh_replication.anisotropic_kernels import fit_pca, make_pack, scores_numpy
 from prh_replication.extract_final import final_feature_path, load_final_prepared, spec_from_manifest
-from prh_replication.io_utils import sha256_file, write_json
+from prh_replication.io_utils import jsonable, sha256_file, write_json
 from prh_replication.kernel_experiment import subset_indices
 from prh_replication.plots import lines
 from prh_replication.registry import MODELS, Paths
+from prh_replication.release_protocol import VIS, dump_fit, eval_onesided, load_splits, pack_ab, partner_sets
 from prh_replication.release_anisotropy import (
     NEAR_ZERO_S,
     b_from_s,
@@ -50,14 +45,12 @@ from prh_replication.release_anisotropy import (
     select_rho_shared,
     signed_correction,
     split_delta_psd_factors,
-    split_delta_psd_subspace,
     uniform_only_b,
     up_down_projectors,
     vech_from_s,
     response_grams_factor,
 )
 
-VIS = ra.VIS
 PARENT = "release_anisotropy"
 OUT_NAME = "release_anisotropy_repair"
 
@@ -96,7 +89,7 @@ def main():
     write_json(out / "design.json", design)
     write_json(out / "parent_design.json", orig_design)
 
-    man, splits = ra.load_splits(paths, ROOT)
+    man, splits = load_splits(paths, ROOT)
     rows = list(manifest["base_panel"]) + list(manifest["supplementary_qwen3x"])
     specs = {r["key"]: spec_from_manifest(r) for r in rows}
     base_qwen = [r["key"] for r in manifest["base_panel"] if r["family"] == "Qwen"]
@@ -142,7 +135,7 @@ def main():
             }
             if abs(old - rec["variance_fraction"]) > 1e-8:
                 raise RuntimeError(f"PCA mismatch {key}: {old} vs {rec['variance_fraction']}")
-    write_json(out / "pca_provenance.json", ra.jsonable(pca_check))
+    write_json(out / "pca_provenance.json", jsonable(pca_check))
     write_json(out / "feature_hashes.json", hashes)
 
     native_src = parent / "native_matrix.json"
@@ -184,7 +177,7 @@ def main():
     if p01.exists() and "qwen2-7b" in cache:
         raw = json.loads(p01.read_text())
         s01 = np.array(raw["s_a"], dtype=np.float64)
-        pack_tr, _, _ = ra.pack_ab(cache, pca, "qwen2-7b", "dinov2-small", "train")
+        pack_tr, _, _ = pack_ab(cache, pca, "qwen2-7b", "dinov2-small", "train")
         vech = vech_from_s(s01)
         e01 = evaluate_one_sided_vech(pack_tr, vech, 0.1)
         diag["sample_pair"] = sample_pair
@@ -199,10 +192,10 @@ def main():
                 "eig_ok": ev["eig_ok"],
                 "excess_matches_01": abs(ev["train_excess"] - e01["train_excess"]) < 1e-10,
             }
-    write_json(out / "diagnosis.json", ra.jsonable(diag))
+    write_json(out / "diagnosis.json", jsonable(diag))
     print("diagnosis written", diag.get("sample_pair"), flush=True)
 
-    partners = ra.partner_sets(base_qwen, base_olmo, supp)
+    partners = partner_sets(base_qwen, base_olmo, supp)
     partners = {k: [p for p in v if p in cache] for k, v in partners.items() if k in cache}
     langs = [k for k in (base_qwen + base_olmo + supp) if k in cache]
 
@@ -260,9 +253,9 @@ def main():
                         raw["eig_a"] = np.array(raw["eig_a"], np.float64)
                         fit = raw
                     else:
-                        pack_tr, _, _ = ra.pack_ab(cache, pca, a, b, "train")
+                        pack_tr, _, _ = pack_ab(cache, pca, a, b, "train")
                         fit = fit_one_sided(pack_tr, rho=float(rho), n_steps=n_steps, incumbents=incumbents)
-                        write_json(fpath, ra.dump_fit(fit))
+                        write_json(fpath, dump_fit(fit))
                     tex = fit["train"]["excess"]
                     if float(rho) > 0 and tex + 1e-8 < prev_train:
                         train_mono.append({"a": a, "b": b, "rho": float(rho), "train": tex, "prev": prev_train, "ok": False})
@@ -271,11 +264,11 @@ def main():
                     prev_train = max(prev_train, tex)
                     incumbents.append(np.array(fit["s_a"], dtype=np.float64))
                     cands[float(rho)] = fit
-                    pack_va, _, _ = ra.pack_ab(cache, pca, a, b, "val")
-                    pack_te, za_te, zb_te = ra.pack_ab(cache, pca, a, b, "test")
+                    pack_va, _, _ = pack_ab(cache, pca, a, b, "val")
+                    pack_te, za_te, zb_te = pack_ab(cache, pca, a, b, "test")
                     ba = fit["b_a"]
                     ev_va = scores_numpy(ba - np.eye(ba.shape[0]), np.zeros((pack_va["q_b"], pack_va["q_b"])), pack_va)
-                    ev_te = ra.eval_onesided(za_te, zb_te, pca[a]["U"], pca[b]["U"], ba, n_perm=0, seed=0)
+                    ev_te = eval_onesided(za_te, zb_te, pca[a]["U"], pca[b]["U"], ba, n_perm=0, seed=0)
                     dec = decompose_s(fit["s_a"])
                     pair_eval.append({
                         "a": a, "b": b, "rho": float(rho), "kind": "one_sided_repaired",
@@ -291,13 +284,13 @@ def main():
                         "test": ev_te,
                         "selected_start": fit.get("selected_start"),
                     })
-                pack_va, _, _ = ra.pack_ab(cache, pca, a, b, "val")
+                pack_va, _, _ = pack_ab(cache, pca, a, b, "val")
                 rho_h, _ = select_rho_by_val(cands, pack_va)
                 fits[f"{a}__{b}"] = {"cands": cands, "headline_rho": float(rho_h)}
                 print(f"onesided {a}|{b} headline_rho={rho_h} D={cands[float(rho_h)]['d_attained']:.4f}", flush=True)
-        write_json(out / "pair_eval.json", ra.jsonable(pair_eval))
+        write_json(out / "pair_eval.json", jsonable(pair_eval))
         write_json(out / "headline_rho.json", {k: v["headline_rho"] for k, v in fits.items()})
-        write_json(out / "train_monotonicity.json", ra.jsonable(train_mono))
+        write_json(out / "train_monotonicity.json", jsonable(train_mono))
         n_mono_fail = sum(1 for r in train_mono if not r["ok"])
         print(f"train monotonicity failures: {n_mono_fail}/{len(train_mono)}", flush=True)
 
@@ -308,7 +301,7 @@ def main():
                 continue
             fit = fits[f"{rec['a']}__{rec['b']}"]["cands"][float(rec["rho"])]
             s = np.array(fit["s_a"], dtype=np.float64)
-            pack_te, _, _ = ra.pack_ab(cache, pca, rec["a"], rec["b"], "test")
+            pack_te, _, _ = pack_ab(cache, pca, rec["a"], rec["b"], "test")
             qb = pack_te["q_b"]
             eye_a = np.zeros((pack_te["q_a"], pack_te["q_a"]))
             sc_id = scores_numpy(eye_a, np.zeros((qb, qb)), pack_te)
@@ -330,7 +323,7 @@ def main():
                 "d_uniform": rec["d_uniform"],
                 "d_directional": rec["d_directional"],
             })
-        write_json(out / "ablations.json", ra.jsonable(ablations))
+        write_json(out / "ablations.json", jsonable(ablations))
 
         # Consistency with S and S_tilde
         cons = []
@@ -364,7 +357,7 @@ def main():
                                 "down_agreement_stilde": projector_agreement(pd, qd),
                                 "induced_deltaK_cosine": fro_cosine(ga, gb),
                             })
-        write_json(out / "consistency.json", ra.jsonable(cons))
+        write_json(out / "consistency.json", jsonable(cons))
 
         # Transfer
         transfer = []
@@ -376,7 +369,7 @@ def main():
                     for rho in rhos:
                         fit_b = fits[f"{a}__{b}"]["cands"][float(rho)]
                         fit_c = fits[f"{a}__{c}"]["cands"][float(rho)]
-                        pack_te, _, _ = ra.pack_ab(cache, pca, a, c, "test")
+                        pack_te, _, _ = pack_ab(cache, pca, a, c, "test")
                         qb = pack_te["q_b"]
                         z = np.zeros((qb, qb))
                         za = np.zeros((pack_te["q_a"], pack_te["q_a"]))
@@ -402,7 +395,7 @@ def main():
                             "d_transferred": fit_b["d_attained"],
                             "mu": decompose_s(sb)["mu"],
                         })
-        write_json(out / "transfer.json", ra.jsonable(transfer))
+        write_json(out / "transfer.json", jsonable(transfer))
 
         # LOPO with nested incumbents
         lopo_rows = []
@@ -421,13 +414,13 @@ def main():
                     incumbents = []
                     cands = {}
                     for rho in rhos:
-                        packs_tr = [ra.pack_ab(cache, pca, a, p, "train")[0] for p in others]
+                        packs_tr = [pack_ab(cache, pca, a, p, "train")[0] for p in others]
                         fit = fit_one_sided_shared(packs_tr, rho=float(rho), n_steps=n_steps, incumbents=incumbents)
                         cands[float(rho)] = fit
                         incumbents.append(fit["s_a"])
-                    packs_va = [ra.pack_ab(cache, pca, a, p, "val")[0] for p in others]
+                    packs_va = [pack_ab(cache, pca, a, p, "val")[0] for p in others]
                     rho_h, chosen = select_rho_shared(cands, packs_va)
-                    pack_te, _, _ = ra.pack_ab(cache, pca, a, held, "test")
+                    pack_te, _, _ = pack_ab(cache, pca, a, held, "test")
                     ba = chosen["b_a"]
                     sc = scores_numpy(ba - np.eye(ba.shape[0]), np.zeros((pack_te["q_b"], pack_te["q_b"])), pack_te)
                     sc_id = scores_numpy(np.zeros((pack_te["q_a"], pack_te["q_a"])), np.zeros((pack_te["q_b"], pack_te["q_b"])), pack_te)
@@ -448,14 +441,14 @@ def main():
             incumbents = []
             cands = {}
             for rho in rhos:
-                packs_tr = [ra.pack_ab(cache, pca, a, p, "train")[0] for p in lang_partners]
+                packs_tr = [pack_ab(cache, pca, a, p, "train")[0] for p in lang_partners]
                 fit = fit_one_sided_shared(packs_tr, rho=float(rho), n_steps=n_steps, incumbents=incumbents)
                 cands[float(rho)] = fit
                 incumbents.append(fit["s_a"])
-            packs_va = [ra.pack_ab(cache, pca, a, p, "val")[0] for p in lang_partners]
+            packs_va = [pack_ab(cache, pca, a, p, "val")[0] for p in lang_partners]
             rho_h, chosen = select_rho_shared(cands, packs_va)
             for v in vis_p:
-                pack_te, _, _ = ra.pack_ab(cache, pca, a, v, "test")
+                pack_te, _, _ = pack_ab(cache, pca, a, v, "test")
                 ba = chosen["b_a"]
                 sc = scores_numpy(ba - np.eye(ba.shape[0]), np.zeros((pack_te["q_b"], pack_te["q_b"])), pack_te)
                 sc_id = scores_numpy(np.zeros((pack_te["q_a"], pack_te["q_a"])), np.zeros((pack_te["q_b"], pack_te["q_b"])), pack_te)
@@ -466,7 +459,7 @@ def main():
                     "held_out_modality": "vision",
                     "note": "shared language-partner metric; vision never used in fit or selection",
                 })
-        write_json(out / "lopo.json", ra.jsonable(lopo_rows))
+        write_json(out / "lopo.json", jsonable(lopo_rows))
 
         print("signatures + Haar orientation reference", flush=True)
     sig_rows = []
@@ -526,7 +519,7 @@ def main():
                             "correction_mag_i": mag1, "correction_mag_j": mag2,
                             "signed_note": "signed cosine is not PSD-kernel CKA; Haar reference preserves eigenvalues only",
                         })
-    write_json(out / "signatures.json", ra.jsonable(sig_rows))
+    write_json(out / "signatures.json", jsonable(sig_rows))
 
     # Shuffle over full budget grid
     shuf = []
@@ -540,8 +533,8 @@ def main():
             xa_te, xb_te = cache[m]["test"], cache[partner]["test"]
             mu_a, mu_b = pca[m]["mu"], pca[partner]["mu"]
             ua, ub = pca[m]["U"], pca[partner]["U"]
-            pack_id_te, za_te, zb_te = ra.pack_ab(cache, pca, m, partner, "test")
-            id_te = ra.eval_onesided(za_te, zb_te, ua, ub, np.eye(ua.shape[1]), n_perm=0, seed=0)
+            pack_id_te, za_te, zb_te = pack_ab(cache, pca, m, partner, "test")
+            id_te = eval_onesided(za_te, zb_te, ua, ub, np.eye(ua.shape[1]), n_perm=0, seed=0)
             for seed in seeds:
                 g = np.random.default_rng(int(seed) + 17)
                 p_tr = g.permutation(len(xa_tr))
@@ -556,8 +549,8 @@ def main():
                     incumbents.append(fit["s_a"])
                 pack_va = make_pack(xa_va - mu_a, xb_va[p_va] - mu_b, ua, ub)
                 rho_h, chosen = select_rho_by_val(cands, pack_va)
-                sc_true = ra.eval_onesided(xa_te - mu_a, xb_te - mu_b, ua, ub, chosen["b_a"], n_perm=0, seed=0)
-                sc_sh = ra.eval_onesided(xa_te - mu_a, xb_te[p_te] - mu_b, ua, ub, chosen["b_a"], n_perm=0, seed=0)
+                sc_true = eval_onesided(xa_te - mu_a, xb_te - mu_b, ua, ub, chosen["b_a"], n_perm=0, seed=0)
+                sc_sh = eval_onesided(xa_te - mu_a, xb_te[p_te] - mu_b, ua, ub, chosen["b_a"], n_perm=0, seed=0)
                 shuf.append({
                     "model": m, "partner": partner, "seed": int(seed),
                     "selected_rho": float(rho_h),
@@ -569,7 +562,7 @@ def main():
                     "delta_a_true_vs_id": sc_true["a"] - id_te["a"],
                 })
                 print(f"shuffle {m} seed={seed} rho={rho_h} D={chosen['d_attained']:.3f} dA={sc_true['a']-id_te['a']:.4f}", flush=True)
-    write_json(out / "shuffle_fit.json", ra.jsonable(shuf))
+    write_json(out / "shuffle_fit.json", jsonable(shuf))
 
     # Stability at 0.1 and at frozen full-data headline if different
     stab = []
@@ -597,7 +590,7 @@ def main():
                         stab.append({"model": m, "partner": v, "rho": float(rho_s), "subset": si,
                                      "d": fit["d_attained"], "mu": dec["mu"], "d_directional": dec["d_directional"],
                                      "train_excess": fit["train"]["excess"], "direction_defined": dec["direction_defined"]})
-                    pack_te, za_te, zb_te = ra.pack_ab(cache, pca, m, v, "test")
+                    pack_te, za_te, zb_te = pack_ab(cache, pca, m, v, "test")
                     id_te = scores_numpy(np.zeros((pack_te["q_a"], pack_te["q_a"])), np.zeros((pack_te["q_b"], pack_te["q_b"])), pack_te)
                     grams = []
                     for fit in ss:
@@ -635,7 +628,7 @@ def main():
                                 "gminus_heldout_cosine": fro_cosine(grams[i][1], grams[j][1]),
                                 "label": "conditional_stability_frozen_pca",
                             })
-    write_json(out / "stability.json", ra.jsonable(stab))
+    write_json(out / "stability.json", jsonable(stab))
 
     checks = {
         "train_monotonicity_failures": n_mono_fail,
@@ -649,17 +642,17 @@ def main():
         a, b = key.split("__", 1)
         rho_h = fits[key]["headline_rho"]
         fit = fits[key]["cands"][float(rho_h)]
-        pack_te, za_te, zb_te = ra.pack_ab(cache, pca, a, b, "test")
+        pack_te, za_te, zb_te = pack_ab(cache, pca, a, b, "test")
         ba = fit["b_a"]
         contracted = scores_numpy(ba - np.eye(ba.shape[0]), np.zeros((pack_te["q_b"], pack_te["q_b"])), pack_te)
-        direct = ra.eval_onesided(za_te, zb_te, pca[a]["U"], pca[b]["U"], ba, n_perm=0, seed=0)
+        direct = eval_onesided(za_te, zb_te, pca[a]["U"], pca[b]["U"], ba, n_perm=0, seed=0)
         checks["direct_vs_contracted"].append({
             "pair": key, "rho": float(rho_h),
             "contracted_a": contracted["a"], "direct_a": direct["a"],
             "abs_diff": abs(contracted["a"] - direct["a"]),
             "ok": abs(contracted["a"] - direct["a"]) < 1e-6,
         })
-    write_json(out / "checks.json", ra.jsonable(checks))
+    write_json(out / "checks.json", jsonable(checks))
 
     # Plots: excess vs rho repaired VL
     series = {}
@@ -705,7 +698,7 @@ def main():
         "two_sided_retained": True,
         "native_reused": True,
     }
-    write_json(out / "summary.json", ra.jsonable(summary))
+    write_json(out / "summary.json", jsonable(summary))
 
     versions = {
         "python": sys.version,

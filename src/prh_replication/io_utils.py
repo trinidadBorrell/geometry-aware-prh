@@ -4,15 +4,45 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
+
+
+def skip_if_complete(out: Path, *, force: bool = False, smoke: bool = False, label: str | None = None) -> bool:
+    """True if a completed summary.json exists and this is not an explicit rerun."""
+    if (out / "summary.json").exists() and not force and not smoke:
+        name = label or out.name
+        print(f"{name} already complete; pass --force to rerun", flush=True)
+        return True
+    return False
 
 
 def ensure_dir(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def jsonable(x: Any) -> Any:
+    """JSON-safe values: numpy/torch/Path; non-finite floats become null."""
+    if isinstance(x, dict):
+        return {k: jsonable(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [jsonable(v) for v in x]
+    if isinstance(x, np.ndarray):
+        return jsonable(x.tolist())
+    if isinstance(x, (np.floating, np.integer, np.bool_)):
+        return x.item()
+    if isinstance(x, torch.Tensor):
+        return jsonable(x.detach().cpu().tolist())
+    if isinstance(x, Path):
+        return str(x)
+    if isinstance(x, float) and not math.isfinite(x):
+        return None
+    return x
 
 
 def write_json(path: Path, payload: Any) -> None:

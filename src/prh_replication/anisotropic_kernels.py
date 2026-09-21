@@ -140,6 +140,9 @@ def _scores_from_deltas(
     nl = torch.sqrt(torch.clamp(nl2, min=0.0))
     finite = torch.isfinite(ip) & torch.isfinite(nk) & torch.isfinite(nl) & torch.isfinite(trk) & torch.isfinite(trl)
     valid = finite & (nk > 0) & (nl > 0)
+    # False branches are constant leaves. At identity, da=0 is built via eigh of
+    # S=0 (repeated eigenvalues): eigenvector derivatives are undefined, so
+    # `excess.requires_grad` can be False even when params require grad.
     a = torch.where(valid, ip / (nk * nl), torch.tensor(float("nan"), dtype=torch.float64))
     b = torch.where(valid, (trk * trl) / ((n - 1.0) * nk * nl), torch.tensor(float("nan"), dtype=torch.float64))
     den = trk * trl

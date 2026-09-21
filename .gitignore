@@ -13,9 +13,8 @@ data/cache/
 *.pth
 *.bin
 *.safetensors
+*.npz
 
-# Keep small result tables and plots
-!results/**/*.json
-!results/**/*.csv
-!results/**/*.md
-!results/**/*.png
+# Generated experiment outputs (work disk is authoritative)
+results/*
+!results/README.md
