@@ -136,6 +136,8 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, precise=True):
 def to_feature_filename(input_dir, modality, model_name):
     save_name = f"{model_name.replace('/', '_')}"
 
+    save_name += f"_pool-avg"
+
     mode = 'prh_llms' if modality == 'language' else 'prh_vlms'
 
     save_path = os.path.join(input_dir, mode, 'wit_1024', f"{save_name}.pt")
