@@ -1,13 +1,12 @@
 import os
+import re
 import numpy as np
 import matplotlib.pyplot as plt
-import re
-from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+from matplotlib.gridspec import GridSpec
 
 RESULTS_DIR = "/workspace/results/emily/alignment"
 FIGURES_DIR = "/workspace/results/emily/figures-0921"
 TOPK = 10
-
 CELL = 0.30  # inches per matrix cell
 
 METRICS = ["cycle_knn", "mutual_knn", "cka", "unbiased_cka", "cknna"]
@@ -69,9 +68,8 @@ def short_label(name):
 
 
 def compact_lvm_label(name):
-    """(task, ViT variant) — e.g. 'augreg_in21k\\ntiny_p16'"""
     task = task_for_model(name)
-    base = name.split(".")[0]  # e.g. vit_tiny_patch16_224
+    base = name.split(".")[0]
     parts = base.split("_")
     size = parts[1] if len(parts) > 1 else base
     patch_match = re.search(r"patch(\d+)", base)
@@ -92,8 +90,13 @@ def load_scores(metric, topk, null_calibrate):
     return data["scores"]
 
 
-def draw_panel(ax, mat, row_labels, col_labels, cmap, vlo, vhi, title, label_fontsize):
-    im = ax.imshow(mat, cmap=cmap, vmin=vlo, vmax=vhi, aspect="auto")
+def draw_panel(ax, mat, row_labels, col_labels, cmap, title, label_fontsize, diverging=False):
+    if diverging:
+        m = np.abs(mat).max()
+        m = m if m > 0 else 1e-6
+        im = ax.imshow(mat, cmap=cmap, vmin=-m, vmax=m, aspect="auto")
+    else:
+        im = ax.imshow(mat, cmap=cmap, aspect="auto")  # no normalization — auto-scaled per panel
     ax.set_xticks(range(len(col_labels)))
     ax.set_xticklabels(col_labels, rotation=90, fontsize=label_fontsize)
     ax.set_yticks(range(len(row_labels)))
@@ -102,10 +105,56 @@ def draw_panel(ax, mat, row_labels, col_labels, cmap, vlo, vhi, title, label_fon
     return im
 
 
+def save_full(g, metric, out_path):
+    n_rows, n_cols = len(g["row_labels"]), len(g["col_labels"])
+    fig_h = max(n_rows, 2) * CELL + 2.0
+    fig_w = n_cols * 3 * CELL + 3.0
+    fig = plt.figure(figsize=(fig_w, fig_h))
+    gs = GridSpec(1, 3, wspace=0.5, figure=fig)
+
+    panels = [
+        (g["baseline"], "Baseline", "viridis", False),
+        (g["nc"], "Null-calibrated", "viridis", False),
+        (g["delta"], "Delta (baseline - NC)", "RdBu_r", True),
+    ]
+    for col_idx, (mat, subtitle, cmap, diverging) in enumerate(panels):
+        ax = fig.add_subplot(gs[col_idx])
+        im = draw_panel(ax, mat, g["row_labels"], g["col_labels"], cmap, subtitle, label_fontsize=6, diverging=diverging)
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    fig.suptitle(f"{metric} — {g['title']}", fontsize=13)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_delta_across_metrics(key, title, row_labels, col_labels, deltas_by_metric, out_path):
+    n_rows, n_cols = len(row_labels), len(col_labels)
+    n_metrics = len(deltas_by_metric)
+    fig_h = max(n_rows, 2) * CELL + 2.0
+    fig_w = n_cols * n_metrics * CELL + 2.5 * n_metrics
+    fig = plt.figure(figsize=(fig_w, fig_h))
+    gs = GridSpec(1, n_metrics, wspace=0.6, figure=fig)
+
+    for col_idx, (metric, delta) in enumerate(deltas_by_metric.items()):
+        ax = fig.add_subplot(gs[col_idx])
+        im = draw_panel(ax, delta, row_labels, col_labels, "RdBu_r", metric, label_fontsize=6, diverging=True)
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    fig.suptitle(f"{title} — delta across metrics", fontsize=13)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 os.makedirs(FIGURES_DIR, exist_ok=True)
 
 llm_labels = [short_label(m) for m in llm_models]
-vis_labels = [compact_lvm_label(m) for m in lvm_models]  # already task-contiguous in lvm_models order
+vis_labels = [compact_lvm_label(m) for m in lvm_models]
+
+deltas_by_grouping = {
+    "llmxllm": {"title": "LLM x LLM", "row_labels": llm_labels, "col_labels": llm_labels, "deltas": {}},
+    "visxvis": {"title": "Vision x Vision (all tasks)", "row_labels": vis_labels, "col_labels": vis_labels, "deltas": {}},
+    "llmxvis": {"title": "LLM x Vision (all tasks)", "row_labels": llm_labels, "col_labels": vis_labels, "deltas": {}},
+}
 
 for metric in METRICS:
     baseline_full = load_scores(metric, TOPK, False)
@@ -118,96 +167,34 @@ for metric in METRICS:
     )
     assert nc_full.shape == baseline_full.shape
 
-    groupings = [
-        {
+    groupings = {
+        "llmxllm": {
             "title": "LLM x LLM",
-            "row_labels": llm_labels,
-            "col_labels": llm_labels,
+            "row_labels": llm_labels, "col_labels": llm_labels,
             "baseline": baseline_full[:N_LLM, :N_LLM],
             "nc": nc_full[:N_LLM, :N_LLM],
         },
-        {
+        "visxvis": {
             "title": "Vision x Vision (all tasks)",
-            "row_labels": vis_labels,
-            "col_labels": vis_labels,
+            "row_labels": vis_labels, "col_labels": vis_labels,
             "baseline": baseline_full[N_LLM:, N_LLM:],
             "nc": nc_full[N_LLM:, N_LLM:],
         },
-        {
+        "llmxvis": {
             "title": "LLM x Vision (all tasks)",
-            "row_labels": llm_labels,
-            "col_labels": vis_labels,
+            "row_labels": llm_labels, "col_labels": vis_labels,
             "baseline": baseline_full[:N_LLM, N_LLM:],
             "nc": nc_full[:N_LLM, N_LLM:],
         },
-    ]
-    for g in groupings:
+    }
+
+    for key, g in groupings.items():
         g["delta"] = g["baseline"] - g["nc"]
+        save_full(g, metric, os.path.join(FIGURES_DIR, f"{metric}_{key}_full.png"))
+        deltas_by_grouping[key]["deltas"][metric] = g["delta"]
 
-    # --- normalize across all three groupings for this metric ---
-    all_bn = np.concatenate([np.concatenate([g["baseline"].ravel(), g["nc"].ravel()]) for g in groupings])
-    vmin, vmax = all_bn.min(), all_bn.max()
-
-    all_deltas = np.concatenate([g["delta"].ravel() for g in groupings])
-    dmax = np.abs(all_deltas).max()
-    dmax = dmax if dmax > 0 else 1e-6
-
-    # ============ Figure 1: 3x3 (baseline, NC, delta) x (llm-llm, vis-vis, llm-vis) ============
-    height_ratios = [max(len(g["row_labels"]), 2) for g in groupings]
-    max_cols = max(len(g["col_labels"]) for g in groupings)
-
-    fig_h = sum(height_ratios) * CELL + 2.5
-    fig_w = max_cols * 3 * CELL + 3.0
-    fig = plt.figure(figsize=(fig_w, fig_h))
-    outer_gs = GridSpec(3, 1, height_ratios=height_ratios, hspace=1.0, figure=fig)
-
-    bn_axes, d_axes = [], []
-    last_im_bn, last_im_d = None, None
-
-    for row_idx, g in enumerate(groupings):
-        inner_gs = GridSpecFromSubplotSpec(1, 3, subplot_spec=outer_gs[row_idx], wspace=0.4)
-        panels = [
-            (g["baseline"], "Baseline", "viridis", vmin, vmax),
-            (g["nc"], "Null-calibrated", "viridis", vmin, vmax),
-            (g["delta"], "Delta (baseline - NC)", "RdBu_r", -dmax, dmax),
-        ]
-        for col_idx, (mat, subtitle, cmap, vlo, vhi) in enumerate(panels):
-            ax = fig.add_subplot(inner_gs[col_idx])
-            im = draw_panel(
-                ax, mat, g["row_labels"], g["col_labels"], cmap, vlo, vhi,
-                f"{g['title']}\n{subtitle}", label_fontsize=5,
-            )
-            if col_idx < 2:
-                bn_axes.append(ax)
-                last_im_bn = im
-            else:
-                d_axes.append(ax)
-                last_im_d = im
-
-    fig.suptitle(metric, fontsize=14)
-    fig.colorbar(last_im_bn, ax=bn_axes, fraction=0.02, pad=0.02, label="score")
-    fig.colorbar(last_im_d, ax=d_axes, fraction=0.04, pad=0.02, label="delta")
-    fig.savefig(os.path.join(FIGURES_DIR, f"{metric}_full.png"), dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-    # ============ Figure 2: 1x3, delta only ============
-    col_counts = [len(g["col_labels"]) for g in groupings]
-    row_counts = [len(g["row_labels"]) for g in groupings]
-
-    fig_h2 = max(row_counts) * CELL + 2.0
-    fig_w2 = sum(col_counts) * CELL + 2.5
-    fig2 = plt.figure(figsize=(fig_w2, fig_h2))
-    gs2 = GridSpec(1, 3, width_ratios=col_counts, wspace=0.5, figure=fig2)
-
-    last_im_d2 = None
-    for col_idx, g in enumerate(groupings):
-        ax = fig2.add_subplot(gs2[col_idx])
-        last_im_d2 = draw_panel(
-            ax, g["delta"], g["row_labels"], g["col_labels"], "RdBu_r", -dmax, dmax,
-            g["title"], label_fontsize=5,
-        )
-
-    fig2.suptitle(f"{metric} — delta only", fontsize=13)
-    fig2.colorbar(last_im_d2, ax=fig2.axes, fraction=0.03, pad=0.02, label="delta")
-    fig2.savefig(os.path.join(FIGURES_DIR, f"{metric}_delta.png"), dpi=150, bbox_inches="tight")
-    plt.close(fig2)
+for key, info in deltas_by_grouping.items():
+    save_delta_across_metrics(
+        key, info["title"], info["row_labels"], info["col_labels"], info["deltas"],
+        os.path.join(FIGURES_DIR, f"{key}_delta_across_metrics.png"),
+    )
