@@ -444,8 +444,7 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, num_permutations=200,
             if metric_name in ("cka", "unbiased_cka"):
                 hsic_ll = hsic_fn(L_perm, L_perm)
                 hsic_kl = hsic_fn(K, L_perm)
-                score = (hsic_kl / (np.sqrt(hsic_kk * hsic_ll) + 1e-6)).item() if torch.is_tensor(hsic_kl) else hsic_kl / (np.sqrt(hsic_kk * hsic_ll) + 1e-6)
-                score = score.cpu()
+                score = (hsic_kl / (torch.sqrt(hsic_kk * hsic_ll) + 1e-6)).item()
 
             elif metric_name == "cknna":
                 sim_kl = similarity_cknna(K, L_perm, topk)
