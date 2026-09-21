@@ -242,6 +242,11 @@ if __name__ == "__main__":
     alignment_scores, alignment_indices = compute_alignment(models_x_paths, models_y_paths, args.metric, args.topk, args.null_calibrate, args.num_permutations, args.quantile, args.precise)
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    np.save(save_path, {"scores": alignment_scores, "indices": alignment_indices})
+    np.save(save_path, {
+        "scores": alignment_scores,
+        "indices": alignment_indices,
+        "x_models": [m for m, _ in models_x],
+        "y_models": [m for m, _ in models_y],
+    })
     print(f"saved to {save_path}")
     
