@@ -391,11 +391,9 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, num_permutations=200,
         _, topk_K_indices = torch.topk(K_hat, topk, dim=1)
         _, topk_L_indices = torch.topk(L_hat, topk, dim=1)
         
-        # create masks for nearest neighbors
         mask_K = torch.zeros(n, n, device=device).scatter_(1, topk_K_indices, 1)
         mask_L = torch.zeros(n, n, device=device).scatter_(1, topk_L_indices, 1)
         
-        # intersection of nearest neighbors
         mask = mask_K * mask_L
                     
         if unbiased:
@@ -407,13 +405,13 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, num_permutations=200,
     device = feats_A.device
     kwargs = {"topk": topk} if "knn" in metric_name else {}
 
-    hsic_fn = hsic_unbiased if unbiased else hsic_biased
+    metric_unbiased = unbiased if metric_name != "cka" else False
+    hsic_fn = hsic_unbiased if metric_unbiased else hsic_biased
 
     true_score = AlignmentMetrics.measure(metric_name, feats_A, feats_B, **kwargs)
     null_scores = []
 
     if metric_name in KERNEL_METRICS:
-        # precompute once, outside the loop
         K = feats_A @ feats_A.T   # (n, n)
         L = feats_B @ feats_B.T   # (n, n)
 
@@ -421,56 +419,46 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, num_permutations=200,
             hsic_kk = hsic_fn(K, K)
         elif metric_name in ("cknna", "mutual_knn"):
 
-
             if unbiased:            
                 K_hat = K.clone().fill_diagonal_(float("-inf"))
                 L_hat = L.clone().fill_diagonal_(float("-inf"))
             else:
                 K_hat, L_hat = K, L
 
-            # get topk indices for each row
-            # if unbiased we cannot attend to the diagonal unless full topk
-            # else we can attend to the diagonal
             _, topk_K_indices = torch.topk(K_hat, topk, dim=1)
             mask_K = torch.zeros(n, n, device=device).scatter_(1, topk_K_indices, 1)
 
-        for _ in range(num_permutations):
-            perm = torch.randperm(n)  # random row permutation of length n
+            if metric_name == "mutual_knn":
+                knn_A = (
+                    K.clone().fill_diagonal_(-1e8).argsort(dim=1, descending=True)[:, :topk]
+                )
+                range_tensor = torch.arange(n, device=device).unsqueeze(1)
+                lvm_mask = torch.zeros(n, n, device=device)
+                lvm_mask[range_tensor, knn_A] = 1.0
 
-            # reindex the precomputed L instead of recomputing feats_B[perm] @ feats_B[perm].T
+        for _ in range(num_permutations):
+            perm = torch.randperm(n, device=device)
+
             L_perm = L[perm][:, perm]
 
             if metric_name in ("cka", "unbiased_cka"):
-                hsic_ll = hsic_fn(L_perm, L_perm)  # hsic_fn(L_perm, L_perm)
-                hsic_kl = hsic_fn(K, L_perm)  # hsic_fn(K, L_perm)
-                score = hsic_kl / (np.sqrt(hsic_kk * hsic_ll) + 1e-6)
+                hsic_ll = hsic_fn(L_perm, L_perm)
+                hsic_kl = hsic_fn(K, L_perm)
+                score = (hsic_kl / (np.sqrt(hsic_kk * hsic_ll) + 1e-6)).item() if torch.is_tensor(hsic_kl) else hsic_kl / (np.sqrt(hsic_kk * hsic_ll) + 1e-6)
 
             elif metric_name == "cknna":
                 sim_kl = similarity_cknna(K, L_perm, topk)
                 sim_kk = similarity_cknna(K, K, topk)
-                sim_ll = similarity_cknna(L, L_perm, topk)
+                sim_ll = similarity_cknna(L_perm, L_perm, topk)
                         
                 score = sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
 
             elif metric_name == "mutual_knn":
-                # neighbor lookup from L_perm (argsort, same as compute_nearest_neighbors)
-                # then intersect against feats_A's fixed neighbor set — same accuracy formula as before
-
-                knn_A = (
-                    K.fill_diagonal_(-1e8).argsort(dim=1, descending=True)[:, :topk]
-                )
-
                 knn_B = (
-                    L_perm.fill_diagonal_(-1e8).argsort(dim=1, descending=True)[:, :topk]
+                    L_perm.clone().fill_diagonal_(-1e8).argsort(dim=1, descending=True)[:, :topk]
                 )
-
-                range_tensor = torch.arange(n, device=knn_A.device).unsqueeze(1)
-                
-                # Create binary masks for knn_A and knn_B
-                lvm_mask = torch.zeros(n, n, device=knn_A.device)
-                llm_mask = torch.zeros(n, n, device=knn_A.device)
-        
-                lvm_mask[range_tensor, knn_A] = 1.0
+                range_tensor = torch.arange(n, device=device).unsqueeze(1)
+                llm_mask = torch.zeros(n, n, device=device)
                 llm_mask[range_tensor, knn_B] = 1.0
                 
                 acc = (lvm_mask * llm_mask).sum(dim=1) / topk
@@ -479,12 +467,13 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, num_permutations=200,
             null_scores.append(score)
 
     else:
-        # svcca, cycle_knn, lcs_knn, edit_distance_knn — no fixed kernel matrix to exploit
         for _ in range(num_permutations):
-            perm = torch.randperm(n)
+            perm = torch.randperm(n, device=device)
             feats_B_perm = feats_B[perm]
             score = AlignmentMetrics.measure(metric_name, feats_A, feats_B_perm, **kwargs)
-            null_scores = np.array(null_scores)
+            null_scores.append(score)
+
+    null_scores = np.array(null_scores)
     null_quantile = np.quantile(null_scores, quantile)
     gated_score = max(0, true_score - null_quantile)
 
