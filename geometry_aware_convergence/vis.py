@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 RESULTS_DIR = "/workspace/results/emily/alignment"
-FIGURES_DIR = "/figures-0921"
+FIGURES_DIR = "/workspace/results/emily/figures-0921"
 TOPK = 10
 
 METRICS = ["cycle_knn", "mutual_knn", "cka", "unbiased_cka", "cknna"]
