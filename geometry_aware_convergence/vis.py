@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import re
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 RESULTS_DIR = "/workspace/results/emily/alignment"
