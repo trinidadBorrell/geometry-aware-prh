@@ -376,3 +376,12 @@ if __name__ == "__main__":
         print(f"{metric.rjust(20)}: {np.mean(scores):1.3f} [elapsed: {np.mean(times):.2f}s]")
 
     print(f'Total time: {time.time() - t0:.2f}s')
+
+def null_calibrate(metric_name, feats_A, feats_B, topk, num_permutations, quantile):
+    kwargs = {}
+    if 'knn' in metric:
+        kwargs['topk'] = topk
+    
+    score = AlignmentMetrics.measure(metric_name, feats_A, feats_B, **kwargs)
+
+    
