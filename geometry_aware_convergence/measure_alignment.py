@@ -180,9 +180,7 @@ if __name__ == "__main__":
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
     
-    save_path = utils.to_alignment_filename(
-            args.output_dir, args.metric, args.topk
-    )
+    save_path = to_alignment_filename(args.output_dir, args.metric, args.topk)
     
     if os.path.exists(save_path) and not args.force_remake:
         print(f"alignment already exists at {save_path}")
