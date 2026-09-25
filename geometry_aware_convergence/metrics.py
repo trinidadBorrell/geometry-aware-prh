@@ -464,7 +464,13 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
         return sim
     n = feats_A.shape[0]
     device = feats_A.device
-    kwargs = {"topk": topk} if "knn" in metric_name else {}
+    kwargs = {}
+    if 'knn' in metric:
+        kwargs['topk'] = topk
+    if 'knd' in metric:
+        assert dist is not None, 'dist must be defined'
+        kwargs['cutoff'] = dist
+
 
     metric_unbiased = unbiased if metric_name != "cka" else False
     hsic_fn = hsic_unbiased if metric_unbiased else hsic_biased

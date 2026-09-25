@@ -142,7 +142,7 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calib
 def to_alignment_filename(output_dir, metric, topk, dist, null_calibrate):
     if null_calibrate:
         metric += "_NC"
-    dist_flag = f'_d{dist}' if dist else ''
+    dist_flag = f'_d{dist}' if dist > 0 else ''
     save_path = os.path.join(
         output_dir,
         f"{metric}_k{topk}{dist_flag}.npy" if 'knn' in metric else f"{metric}.npy"
