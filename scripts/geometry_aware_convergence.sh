@@ -21,5 +21,5 @@ DISTS=(0.95 0.9 0.8 0.7 0.6)
 
 for dist in "${DISTS[@]}"; do
     python measure_alignment.py --modality_x all --modality_y all --metric cknda --dist "$dist"
-    python measure_alignment.py --modality_x all --modality_y all --metric cknda --null-calibrate --topk "$dist"
+    python measure_alignment.py --modality_x all --modality_y all --metric cknda --null-calibrate --dist "$dist"
 done
