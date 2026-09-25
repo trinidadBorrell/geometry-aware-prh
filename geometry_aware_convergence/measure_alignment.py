@@ -10,27 +10,12 @@ import metrics
 from tasks import get_models
 from pprint import pprint
 
+from utils import *
+
 # Copied over from PRH directory.
 
-def prepare_features(feats, q=0.95, exact=False):
-    """
-    Prepare features by removing outliers and normalizing
-    Args:
-        feats: a torch tensor of any share
-        q: the quantile to remove outliers
-    Returns:
-        feats: a torch tensor of the same shape as the input
-    """
-    if isinstance(feats, torch.Tensor):
-        feats = metrics.remove_outliers(feats.float(), q=q, exact=exact)
-        return feats.cuda()
-    elif isinstance(feats, list):
-        return [metrics.remove_outliers(f.float(), q=q, exact=exact).cuda() for f in feats]
-    else:
-        raise ValueError(f"Unsupported input type for prepare_features: {type(feats)}")
 
-
-def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, normalize=True, null_calibration=False, num_permutations=200, quantile=0.95):
+def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, normalize=True, null_calibration=False, num_permutations=200, quantile=0.95):
     """
     Uses different layer combinations of x_feats and y_feats to find the best alignment
     Args:
@@ -61,6 +46,9 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, normalize=True
             kwargs = {}
             if 'knn' in metric:
                 kwargs['topk'] = topk
+            if 'kdn' in metric:
+                assert dist is not None, 'dist must be defined'
+                kwargs['dist'] = dist
 
             score = metrics.AlignmentMetrics.measure(metric, x_aligned, y_aligned, **kwargs)
 
@@ -77,11 +65,11 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, normalize=True
         else:
             x_aligned = x
             y_aligned = y
-        best_alignment_score = metrics.null_calibrate(metric, x_aligned, y_aligned, topk=topk, num_permutations=num_permutations, quantile=quantile)['gated']
+        best_alignment_score = metrics.null_calibrate(metric, x_aligned, y_aligned, topk=topk, dist=dist, num_permutations=num_permutations, quantile=quantile)['gated']
     return best_alignment_score, best_alignment_indices
 
     
-def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, null_calibration, num_permutations, quantile, precise=True):
+def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calibration, num_permutations, quantile, precise=True):
     """
     Args:
         x_feat_paths: list of paths to x features
@@ -129,7 +117,7 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, null_calibration
                 y_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_y]
             best_score, best_indices = compute_score(
                 y_feats, x_feats,
-                metric=metric, topk=topk,
+                metric=metric, topk=topk, dist=dist,
                 null_calibration=null_calibration, 
                 num_permutations=num_permutations,
                 quantile=quantile
@@ -150,24 +138,14 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, null_calibration
     return alignment_scores, alignment_indices
 
 
-def to_feature_filename(input_dir, modality, model_name):
-    save_name = f"{model_name.replace('/', '_')}"
-    pooling = "_pool-avg" if modality == 'language' else '_pool-cls'
 
-
-    save_name += pooling
-    mode = 'prh_llms' if modality == 'language' else 'prh_vlms/prh'
-
-    save_path = os.path.join(input_dir, mode, 'wit_1024', f"{save_name}.pt")
-    return save_path
-
-
-def to_alignment_filename(output_dir, metric, topk, null_calibrate):
+def to_alignment_filename(output_dir, metric, topk, dist, null_calibrate):
     if null_calibrate:
         metric += "_NC"
+    dist_flag = f'_d{dist}' if dist else ''
     save_path = os.path.join(
         output_dir,
-        f"{metric}_k{topk}.npy" if 'knn' in metric else f"{metric}.npy"
+        f"{metric}_k{topk}{dist_flag}.npy" if 'knn' in metric else f"{metric}.npy"
     )
     return save_path
 
@@ -186,6 +164,7 @@ if __name__ == "__main__":
     parser.add_argument("--modelset",       type=str, default="val", choices=["val", "test"])
     parser.add_argument("--metric",         type=str, default="mutual_knn", choices=metrics.AlignmentMetrics.SUPPORTED_METRICS)
     parser.add_argument("--topk",           type=int, default=10)
+    parser.add_argument("--dist",           default=None)
 
     parser.add_argument("--input_dir",      type=str, default="/workspace/hf")
     parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/alignment")
@@ -204,7 +183,7 @@ if __name__ == "__main__":
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
     
-    save_path = to_alignment_filename(args.output_dir, args.metric, args.topk, args.null_calibrate)
+    save_path = to_alignment_filename(args.output_dir, args.metric, args.topk, args.dist, args.null_calibrate)
     
     if os.path.exists(save_path) and not args.force_remake:
         print(f"alignment already exists at {save_path}")
@@ -232,6 +211,9 @@ if __name__ == "__main__":
     print(f"metric: \t{args.metric}")
     if 'knn' in args.metric:
         print(f"topk:\t{args.topk}")
+    if 'kdn' in args.dist:
+        print(f"dist:\t{args.dist}")
+
     
     print(f"models_x_paths:")    
     pprint(models_x_paths)
@@ -239,7 +221,7 @@ if __name__ == "__main__":
     pprint(models_y_paths)
     
     print('\nmeasuring alignment')
-    alignment_scores, alignment_indices = compute_alignment(models_x_paths, models_y_paths, args.metric, args.topk, args.null_calibrate, args.num_permutations, args.quantile, args.precise)
+    alignment_scores, alignment_indices = compute_alignment(models_x_paths, models_y_paths, args.metric, args.topk, args.dist, args.null_calibrate, args.num_permutations, args.quantile, args.precise)
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     np.save(save_path, {

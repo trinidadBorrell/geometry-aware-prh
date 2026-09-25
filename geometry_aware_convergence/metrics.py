@@ -229,6 +229,45 @@ class AlignmentMetrics:
         return sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
 
 
+    @staticmethod
+    def cknda(feats_A, feats_B, cutoff, distance_agnostic=False, unbiased=True):
+        """ distance based CKNNA variant, 0 <= cutoff <= 1 """
+        n = feats_A.shape[0]
+                            
+        K = feats_A @ feats_A.T
+        L = feats_B @ feats_B.T
+        device = feats_A.device
+
+        def similarity(K, L):                         
+            if unbiased:            
+                K_hat = K.clone().fill_diagonal_(float("-inf"))
+                L_hat = L.clone().fill_diagonal_(float("-inf"))
+            else:
+                K_hat, L_hat = K, L
+            
+            # create masks for nearest dist-neighbors
+            mask_K = torch.where(K_hat >=cutoff, torch.ones(n, n), torch.zeros(n, n), device=device)
+            mask_L = torch.where(L_hat >= cutoff, torch.ones(n, n), torch.zeros(n, n), device=device)
+            
+            # intersection of nearest dist-neighbors
+            mask = mask_K * mask_L
+                        
+            if distance_agnostic:
+                sim = mask * 1.0
+            else:
+                if unbiased:
+                    sim = hsic_unbiased(mask * K, mask * L)
+                else:
+                    sim = hsic_biased(mask * K, mask * L)
+            return sim
+
+        sim_kl = similarity(K, L)
+        sim_kk = similarity(K, K)
+        sim_ll = similarity(L, L)
+                
+        return sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
+
+
 def hsic_unbiased(K, L):
     """
     Compute the unbiased Hilbert-Schmidt Independence Criterion (HSIC) as per Equation 5 in the paper.
@@ -379,7 +418,7 @@ if __name__ == "__main__":
 
 KERNEL_METRICS = {"cka", "unbiased_cka", "cknna", "mutual_knn"}
 
-def null_calibrate(metric_name, feats_A, feats_B, topk=10, num_permutations=200, quantile=0.95, unbiased=True):
+def null_calibrate(metric_name, feats_A, feats_B, topk=10, cutoff=None, num_permutations=200, quantile=0.95, unbiased=True):
 
 
     def similarity_cknna(K, L, topk):                         
@@ -396,6 +435,27 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, num_permutations=200,
         
         mask = mask_K * mask_L
                     
+        if unbiased:
+            sim = hsic_unbiased(mask * K, mask * L)
+        else:
+            sim = hsic_biased(mask * K, mask * L)
+        return sim
+
+    
+    def similarity_cknda(K, L, cutoff):                   
+        if unbiased:            
+            K_hat = K.clone().fill_diagonal_(float("-inf"))
+            L_hat = L.clone().fill_diagonal_(float("-inf"))
+        else:
+            K_hat, L_hat = K, L
+        
+        # create masks for nearest dist-neighbors
+        mask_K = torch.where(K_hat >=cutoff, torch.ones(n, n), torch.zeros(n, n), device=device)
+        mask_L = torch.where(L_hat >= cutoff, torch.ones(n, n), torch.zeros(n, n), device=device)
+        
+        # intersection of nearest dist-neighbors
+        mask = mask_K * mask_L
+            
         if unbiased:
             sim = hsic_unbiased(mask * K, mask * L)
         else:
@@ -450,6 +510,14 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, num_permutations=200,
                 sim_kl = similarity_cknna(K, L_perm, topk)
                 sim_kk = similarity_cknna(K, K, topk)
                 sim_ll = similarity_cknna(L_perm, L_perm, topk)
+                        
+                score = sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
+
+            
+            elif metric_name == "cknda":
+                sim_kl = similarity_cknna(K, L_perm, cutoff)
+                sim_kk = similarity_cknna(K, K, cutoff)
+                sim_ll = similarity_cknna(L_perm, L_perm, cutoff)
                         
                 score = sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
 
