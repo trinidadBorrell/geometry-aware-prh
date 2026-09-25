@@ -516,9 +516,9 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
 
             
             elif metric_name == "cknda":
-                sim_kl = similarity_cknna(K, L_perm, dist)
-                sim_kk = similarity_cknna(K, K, dist)
-                sim_ll = similarity_cknna(L_perm, L_perm, dist)
+                sim_kl = similarity_cknda(K, L_perm, dist)
+                sim_kk = similarity_cknda(K, K, dist)
+                sim_ll = similarity_cknda(L_perm, L_perm, dist)
                         
                 score = sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
 

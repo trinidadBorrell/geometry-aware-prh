@@ -211,7 +211,7 @@ if __name__ == "__main__":
     print(f"metric: \t{args.metric}")
     if 'knn' in args.metric:
         print(f"topk:\t{args.topk}")
-    if 'kdn' in args.metric:
+    if 'knd' in args.metric:
         print(f"dist:\t{args.dist}")
 
     
