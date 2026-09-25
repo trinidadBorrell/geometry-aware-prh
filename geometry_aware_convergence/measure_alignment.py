@@ -164,7 +164,7 @@ if __name__ == "__main__":
     parser.add_argument("--modelset",       type=str, default="val", choices=["val", "test"])
     parser.add_argument("--metric",         type=str, default="mutual_knn", choices=metrics.AlignmentMetrics.SUPPORTED_METRICS)
     parser.add_argument("--topk",           type=int, default=10)
-    parser.add_argument("--dist",           default=None)
+    parser.add_argument("--dist",           type=float, default=0.0)
 
     parser.add_argument("--input_dir",      type=str, default="/workspace/hf")
     parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/alignment")
