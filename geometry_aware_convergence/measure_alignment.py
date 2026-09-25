@@ -46,7 +46,7 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
             kwargs = {}
             if 'knn' in metric:
                 kwargs['topk'] = topk
-            if 'kdn' in metric:
+            if 'knd' in metric:
                 assert dist is not None, 'dist must be defined'
                 kwargs['cutoff'] = dist
 
