@@ -418,7 +418,7 @@ if __name__ == "__main__":
 
 KERNEL_METRICS = {"cka", "unbiased_cka", "cknna", "mutual_knn"}
 
-def null_calibrate(metric_name, feats_A, feats_B, topk=10, cutoff=None, num_permutations=200, quantile=0.95, unbiased=True):
+def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permutations=200, quantile=0.95, unbiased=True):
 
 
     def similarity_cknna(K, L, topk):                         
@@ -515,9 +515,9 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, cutoff=None, num_perm
 
             
             elif metric_name == "cknda":
-                sim_kl = similarity_cknna(K, L_perm, cutoff)
-                sim_kk = similarity_cknna(K, K, cutoff)
-                sim_ll = similarity_cknna(L_perm, L_perm, cutoff)
+                sim_kl = similarity_cknna(K, L_perm, dist)
+                sim_kk = similarity_cknna(K, K, dist)
+                sim_ll = similarity_cknna(L_perm, L_perm, dist)
                         
                 score = sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
 
