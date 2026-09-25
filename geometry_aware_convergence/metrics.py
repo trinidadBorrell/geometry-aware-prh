@@ -247,8 +247,8 @@ class AlignmentMetrics:
                 K_hat, L_hat = K, L
             
             # create masks for nearest dist-neighbors
-            mask_K = torch.where(K_hat >=cutoff, torch.ones(n, n), torch.zeros(n, n), device=device)
-            mask_L = torch.where(L_hat >= cutoff, torch.ones(n, n), torch.zeros(n, n), device=device)
+            mask_K = torch.where(K_hat >=cutoff, torch.ones(n, n, device=device), torch.zeros(n, n, device=device))
+            mask_L = torch.where(L_hat >= cutoff, torch.ones(n, n, device=device), torch.zeros(n, n, device=device))
             
             # intersection of nearest dist-neighbors
             mask = mask_K * mask_L
@@ -451,8 +451,8 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
             K_hat, L_hat = K, L
         
         # create masks for nearest dist-neighbors
-        mask_K = torch.where(K_hat >=cutoff, torch.ones(n, n), torch.zeros(n, n), device=device)
-        mask_L = torch.where(L_hat >= cutoff, torch.ones(n, n), torch.zeros(n, n), device=device)
+        mask_K = torch.where(K_hat >=cutoff, torch.ones(n, n, device=device), torch.zeros(n, n, device=device))
+        mask_L = torch.where(L_hat >= cutoff, torch.ones(n, n, device=device), torch.zeros(n, n, device=device))
         
         # intersection of nearest dist-neighbors
         mask = mask_K * mask_L
