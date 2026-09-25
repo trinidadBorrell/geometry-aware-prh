@@ -9,12 +9,12 @@ cd geometry_aware_convergence
 #     python measure_alignment.py --modality_x all --modality_y all --metric "$metric" --null-calibrate
 # done
 
-KVALS=(5 20 50 100)
+# KVALS=(5 20 50 100)
 
-for k in "${KVALS[@]}"; do
-    # python measure_alignment.py --modality_x all --modality_y all --metric cknna --topk "$k"
-    python measure_alignment.py --modality_x all --modality_y all --metric cknna --null-calibrate --topk "$k"
-done
+# for k in "${KVALS[@]}"; do
+#     # python measure_alignment.py --modality_x all --modality_y all --metric cknna --topk "$k"
+#     python measure_alignment.py --modality_x all --modality_y all --metric cknna --null-calibrate --topk "$k"
+# done
 
 
 DISTS=(0.95 0.9 0.8 0.7 0.6)

@@ -48,7 +48,7 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
                 kwargs['topk'] = topk
             if 'kdn' in metric:
                 assert dist is not None, 'dist must be defined'
-                kwargs['dist'] = dist
+                kwargs['cutoff'] = dist
 
             score = metrics.AlignmentMetrics.measure(metric, x_aligned, y_aligned, **kwargs)
 
