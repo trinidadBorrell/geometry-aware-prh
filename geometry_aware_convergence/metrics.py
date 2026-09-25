@@ -25,6 +25,7 @@ class AlignmentMetrics:
         "cknna",
         "svcca",
         "edit_distance_knn",
+        "cknda"
     ]
 
     @staticmethod
