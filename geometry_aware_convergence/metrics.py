@@ -465,9 +465,9 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
     n = feats_A.shape[0]
     device = feats_A.device
     kwargs = {}
-    if 'knn' in metric:
+    if 'knn' in metric_name:
         kwargs['topk'] = topk
-    if 'knd' in metric:
+    if 'knd' in metric_name:
         assert dist is not None, 'dist must be defined'
         kwargs['cutoff'] = dist
 
