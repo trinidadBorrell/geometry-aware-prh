@@ -145,7 +145,7 @@ def to_alignment_filename(output_dir, metric, topk, dist, null_calibrate):
     dist_flag = f'_d{dist}' if dist > 0 else ''
     save_path = os.path.join(
         output_dir,
-        f"{metric}_k{topk}{dist_flag}.npy" if 'knn' in metric else f"{metric}.npy"
+        f"{metric}_k{topk}{dist_flag}.npy" if ('knn' in metric or 'kdn' in metric) else f"{metric}.npy"
     )
     return save_path
 
