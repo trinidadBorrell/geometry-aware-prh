@@ -1,7 +1,8 @@
 """exp-006: extract PRH-style activations for up to 10k WIT samples into the shared cache.
 
 Data: the first N rows of `askoepke/wit_1m_recaptioned` (config `wit_1m`, which excludes the
-1024 PRH query images), with the original WIT caption. The subset is saved once as parquet so
+1024 PRH query images) that have a non-empty original WIT caption. An empty caption has no
+tokens to pool over and would give NaN text features. The subset is saved once as parquet so
 every model sees exactly the same samples.
 
 Extraction mirrors platonic-rep `extract_features.py`:
@@ -65,7 +66,7 @@ def load_subset(path: Path, n: int) -> pd.DataFrame:
     """First n rows of wit_1m (image bytes, original caption, url), cached as parquet."""
     if path.exists():
         df = pd.read_parquet(path)
-        if len(df) >= n:
+        if len(df) >= n and (df["caption"].str.strip() != "").all():
             return df.iloc[:n]
     from datasets import load_dataset
 
@@ -78,7 +79,10 @@ def load_subset(path: Path, n: int) -> pd.DataFrame:
             buf = io.BytesIO()
             data.convert("RGB").save(buf, format="JPEG", quality=95)
             data = buf.getvalue()
-        rows.append({"image": data, "caption": row["original_caption"], "url": row["url"]})
+        caption = (row["original_caption"] or "").strip()
+        if not caption:
+            continue
+        rows.append({"image": data, "caption": caption, "url": row["url"]})
         if len(rows) == n:
             break
     df = pd.DataFrame(rows)
@@ -160,6 +164,9 @@ def main() -> None:
                 feats, extras = extract_llm(name, df["caption"].tolist(), args.batch_size)
             else:
                 feats, extras = extract_lvm(name, df["image"].tolist(), args.batch_size)
+            if not torch.isfinite(feats).all():
+                bad = (~torch.isfinite(feats)).flatten(1).any(1).nonzero().flatten().tolist()
+                raise ValueError(f"{name}: non-finite features in rows {bad[:10]}")
             print(f"{name}: feats {tuple(feats.shape)}")
             _push(root, name, var, feats, extras)
             del feats
