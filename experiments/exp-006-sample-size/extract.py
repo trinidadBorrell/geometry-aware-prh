@@ -101,12 +101,19 @@ def extract_llm(name: str, texts: list[str], batch_size: int) -> tuple[torch.Ten
     model = load_llm(name)
     tokenizer = load_tokenizer(name)
     device = next(model.parameters()).device
+    # the base transformer returns the same hidden_states without the LM head's
+    # [batch, tokens, vocab] logits (250k vocab for bloom), which we do not need
+    base = model.base_model
     feats = []
     for i in trange(0, len(texts), batch_size, desc=name):
         tok = tokenizer(texts[i : i + batch_size], padding="longest", return_tensors="pt").to(
             device
         )
-        out = model(input_ids=tok["input_ids"], attention_mask=tok["attention_mask"])
+        out = base(
+            input_ids=tok["input_ids"],
+            attention_mask=tok["attention_mask"],
+            output_hidden_states=True,
+        )
         hs = torch.stack(out["hidden_states"]).permute(1, 0, 2, 3)  # [b, L, t, d]
         mask = tok["attention_mask"].unsqueeze(-1).unsqueeze(1)
         feats.append(((hs * mask).sum(2) / mask.sum(2)).float().cpu())
