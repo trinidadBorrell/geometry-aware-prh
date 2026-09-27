@@ -8,6 +8,7 @@
 set -uo pipefail
 . /etc/rp_environment
 export PATH="$HOME/.local/bin:$PATH"
+export HF_HUB_ENABLE_HF_TRANSFER=0
 cd "$(dirname "$0")/../.."
 
 PERSON=${PERSON:-oddharak}
