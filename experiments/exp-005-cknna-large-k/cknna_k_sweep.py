@@ -96,10 +96,13 @@ def self_hsic(m: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
 
 
 class Model:
-    """All layers of one model: Grams, centred Grams, neighbour order, anisotropy."""
+    """A stack of layers: Grams, centred Grams, neighbour order, anisotropy.
 
-    def __init__(self, feats: torch.Tensor):
-        layers = prepare_layers(feats)
+    Takes upstream features [n, L, d] (preprocessed here) or a list of preprocessed layers.
+    """
+
+    def __init__(self, feats: torch.Tensor | list[torch.Tensor]):
+        layers = feats if isinstance(feats, list) else prepare_layers(feats)
         n = layers[0].shape[0]
         self.n = n
         self.K = torch.stack([x @ x.T for x in layers])
@@ -240,6 +243,37 @@ def pair_task(args) -> dict:
     }
 
 
+def vision_vision(root: Path, lvms: list[str], ks: list[int], out: Path) -> None:
+    """PRH Fig. 12 setting: last-block CLS of every ViT against every other, all k at once."""
+    variant = ac.Variant(pool="cls", caption_idx=None, modality="vision")
+    vis = Model([prepare_layers(ac.load_model(root, m, variant)["feats"])[-1] for m in lvms])
+    n = vis.n
+    ks = [min(k, n - 1) for k in ks]
+    flat = lambda x: x.reshape(x.shape[0], -1)  # noqa: E731
+    names = ("mutual_knn", "cknna", "centered", "mask_only")
+    mats = {name: np.zeros((len(ks), len(vis), len(vis)), dtype=np.float32) for name in names}
+    for t, k in enumerate(ks):
+        m = vis.masks(k)
+        mk, mkc = m * vis.K, m * vis.Kc_diag0
+        mats["mutual_knn"][t] = ((flat(m) @ flat(m).T) / (n * k)).numpy()
+        mats["cknna"][t] = _ratio(hsic_pairs(mk, m, m, mk), *[self_hsic(m, vis.K)] * 2).numpy()
+        mats["centered"][t] = _ratio(
+            hsic_pairs(mkc, m, m, mkc), *[self_hsic(m, vis.Kc_diag0)] * 2
+        ).numpy()
+        mats["mask_only"][t] = _ratio(hsic_pairs(m, m, m, m), *[self_hsic(m, m)] * 2).numpy()
+        print(f"vision-vision k={k}", flush=True)
+    out.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        out / "vision_vision.npz",
+        ks=np.array(ks),
+        lvms=np.array(lvms),
+        mean_cos=np.array(vis.mean_cos),
+        std_cos=np.array(vis.std_cos),
+        **mats,
+    )
+    print(f"saved {out / 'vision_vision.npz'}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, default=None, help="activation cache root")
@@ -249,6 +283,9 @@ def main() -> None:
     parser.add_argument("--lvms", default="all", help="'all' (cached modelset), 'diag' or a list")
     parser.add_argument("--ks", default=",".join(map(str, KS)))
     parser.add_argument("--diagnostics", action="store_true")
+    parser.add_argument(
+        "--vision-vision", action="store_true", help="last-block ViT x ViT (PRH Fig. 12) instead"
+    )
     parser.add_argument("--workers", type=int, default=os.cpu_count())
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
@@ -263,6 +300,9 @@ def main() -> None:
 
     llms = pick(args.llms, cached_llms, DIAG_LLMS)
     lvms = pick(args.lvms, cached_lvms, DIAG_LVMS)
+    if args.vision_vision:
+        vision_vision(root, lvms, ks, args.out)
+        return
     (args.out / "pairs").mkdir(parents=True, exist_ok=True)
     partial = args.out / "sweep_pairs.jsonl"
     done = set()
