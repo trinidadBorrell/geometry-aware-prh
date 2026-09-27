@@ -8,7 +8,7 @@ Reads <root>/diagnostics (--diagnostics run) and, when present, <root>/grid; wri
 * fig1_convergence      mKNN(k) and CKNNA(k) with linear CKA and unbiased CKA overlaid, one
                         panel per ViT, mean over LLMs (band = min..max)
 * fig2_why_above_1      CKNNA vs its centred / mask-only variants and its permutation null
-* fig3_anisotropy       CKNNA at k=800 per layer pair vs the layers' mean cosine similarity
+* fig3_above_chance     mKNN minus its chance level, CKNNA minus its permutation-null mean
 * fig4_families         CKNNA(k) for one LLM against every ViT, coloured by vision family
 * fig5_vision_vision    last-block ViT x ViT (PRH Fig. 12 setting): CKNNA and its centred
                         variant for MAE-MAE, MAE-other and other pairs (<root>/vision_vision)
@@ -41,7 +41,10 @@ FAMILIES = [
     ("CLIP", lambda n: "clip" in n and "ft_in12k" not in n),
     ("CLIP (I12K ft)", lambda n: "ft_in12k" in n),
 ]
-DEGENERATE_STD = 0.01  # a layer whose cosine similarities have std below this is ~constant
+# A layer whose cosine similarities have std below this is ~constant (e.g. block-0 CLS of a
+# ViT). Its unbiased HSIC is a float32 cancellation of O(n^2) terms to ~1e-7, so any
+# CKNNA / unbiased CKA involving it near k = n is round-off noise; maxima skip such layers.
+DEGENERATE_STD = 0.01
 
 plt.rcParams.update(
     {
@@ -91,10 +94,25 @@ def load(run: Path) -> list[dict]:
     for r in recs:
         stem = f"{r['llm'].replace('/', '__')}__x__{r['lvm']}"
         r["mats"] = dict(np.load(run / "pairs" / f"{stem}.npz"))
+        a = r["anisotropy"]
+        ok = np.ix_(
+            np.array(a["vision_std_cos"]) > DEGENERATE_STD,
+            np.array(a["language_std_cos"]) > DEGENERATE_STD,
+        )
+        # upstream compute_score semantics (best starts at 0), degenerate layers skipped
+        r["clean"] = {
+            key: np.maximum(np.array([m[ok].max() for m in mat]), 0.0)
+            for key, mat in r["mats"].items()
+            if key not in ("ks", "cka", "joint_density")
+        }
+        r["cka"] = max(float(r["mats"]["cka"][ok].max()), 0.0)
     return recs
 
 
 def series(rec: dict, key: str) -> np.ndarray:
+    """Per-k values; max over non-degenerate layer pairs for the layerwise metrics."""
+    if key in rec.get("clean", {}):
+        return rec["clean"][key]
     return np.array([p[key] for p in rec["per_k"]])
 
 
@@ -151,7 +169,8 @@ def fig1_convergence(recs: list[dict], out: Path) -> None:
         handles, labels, loc="upper center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 1.16)
     )
     fig.suptitle(
-        f"Raw alignment vs neighbourhood size, mean over {len(llms)} LLMs (band = min..max)",
+        f"Raw alignment vs neighbourhood size, mean over {len(llms)} LLMs (band = min..max); "
+        "max over layer pairs, near-constant layers excluded",
         y=1.22,
         color=INK,
     )
@@ -170,7 +189,10 @@ def fig2_why_above_1(recs: list[dict], out: Path, llm: str) -> None:
     for ax, r in zip(np.atleast_1d(axes), rs, strict=True):
         ks, p = series(r, "k"), series(r, "p")
         for key, label, color, ls in curves:
-            ax.plot(ks, series(r, key), color=color, ls=ls, label=label)
+            y = series(r, key).astype(float)
+            if key == "mask_only":  # 0/0 at k = n - 1 (constant kernel has zero HSIC)
+                y[-1] = np.nan
+            ax.plot(ks, y, color=color, ls=ls, label=label)
         ax.plot(ks[:-1], (p * (1 + p))[:-1], color=INK, ls=":", lw=1, label="random masks p(1+p)")
         ax.axhline(1, color=INK, lw=0.8)
         ax.set_title(short(r["lvm"]), color=INK)
@@ -186,37 +208,38 @@ def fig2_why_above_1(recs: list[dict], out: Path, llm: str) -> None:
     save(fig, out, "fig2_why_above_1")
 
 
-def fig3_anisotropy(recs: list[dict], out: Path, k: int = 800) -> None:
-    fig, ax = plt.subplots(figsize=(4.6, 3.4))
-    for fam_idx, (fam, _) in enumerate(FAMILIES):
-        xs, ys = [], []
-        for r in recs:
-            if family(r["lvm"]) != fam:
-                continue
-            t = int(np.argmin(np.abs(r["mats"]["ks"] - k)))
-            a = r["anisotropy"]
-            vm, lm = np.array(a["vision_mean_cos"]), np.array(a["language_mean_cos"])
-            ok_v = np.array(a["vision_std_cos"]) > DEGENERATE_STD
-            ok_l = np.array(a["language_std_cos"]) > DEGENERATE_STD
-            mat = r["mats"]["cknna"][t][np.ix_(ok_v, ok_l)]
-            xs.append(np.sqrt(np.outer(vm[ok_v], lm[ok_l])).ravel())
-            ys.append(mat.ravel())
-        if xs:
-            ax.scatter(
-                np.concatenate(xs),
-                np.concatenate(ys),
-                s=6,
-                alpha=0.35,
-                color=SERIES[fam_idx],
-                lw=0,
-                label=fam,
-            )
-    ax.axhline(1, color=INK, lw=0.8)
-    ax.set_xlabel("anisotropy: sqrt(mean cos(vision layer) x mean cos(LLM layer))")
-    ax.set_ylabel(f"CKNNA at k={k} (every layer pair)")
-    ax.legend(frameon=False, markerscale=3, loc="lower right")
-    ax.set_title("Large-k CKNNA tracks anisotropy, not alignment", color=INK)
-    save(fig, out, "fig3_anisotropy")
+def fig3_above_chance(recs: list[dict], out: Path) -> None:
+    """Observed minus chance: mKNN - k/(n-1) and CKNNA - its permutation-null mean."""
+    lvms = list(dict.fromkeys(r["lvm"] for r in recs))
+    fig, axes = plt.subplots(1, len(lvms), figsize=(2.6 * len(lvms), 2.7), sharey=True)
+    for ax, lvm in zip(np.atleast_1d(axes), lvms, strict=True):
+        rs = [r for r in recs if r["lvm"] == lvm]
+        ks = series(rs[0], "k")
+        curves = {
+            "mutual_knn": (
+                "mutual kNN - k/(n-1)",
+                [series(r, "mutual_knn") - ks / (ks[-1]) for r in rs],
+            ),
+            "cknna": (
+                "CKNNA - null mean (best layer pair)",
+                [np.array([p["cknna"] - p["cknna_null_mean"] for p in r["per_k"]]) for r in rs],
+            ),
+        }
+        for key, (label, ys) in curves.items():
+            y = np.stack(ys)[:, :-1]  # at k = n - 1 mKNN is 1 by construction
+            ax.fill_between(ks[:-1], y.min(0), y.max(0), color=METRIC_COLOR[key], alpha=0.15, lw=0)
+            ax.plot(ks[:-1], y.mean(0), color=METRIC_COLOR[key], label=label)
+        ax.axhline(0, color=INK, lw=0.8)
+        ax.set_title(short(lvm), color=INK)
+        ax.set_xlabel("k")
+        ax.set_xticks([10, 200, 400, 600, 800, 1000])
+    np.atleast_1d(axes)[0].set_ylabel("score above chance")
+    handles, labels = np.atleast_1d(axes)[0].get_legend_handles_labels()
+    fig.legend(
+        handles, labels, loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.1)
+    )
+    fig.suptitle("Alignment above chance vs k (mean over LLMs, band = min..max)", y=1.17, color=INK)
+    save(fig, out, "fig3_above_chance")
 
 
 def fig4_families(recs: list[dict], out: Path, llm: str) -> None:
@@ -270,6 +293,8 @@ def fig5_vision_vision(path: Path, out: Path) -> None:
             ("mask_only", "mask-only CKNNA"),
         ):
             y = d[key][:, iu[0], iu[1]][:, sel]
+            if key == "mask_only":  # 0/0 at k = n - 1 (constant kernel has zero HSIC)
+                y = np.where((ks == ks.max())[:, None], np.nan, y)
             ax.fill_between(ks, y.min(1), y.max(1), color=METRIC_COLOR[key], alpha=0.15, lw=0)
             ax.plot(ks, y.mean(1), color=METRIC_COLOR[key], label=label)
         ax.axhline(1, color=INK, lw=0.8)
@@ -318,7 +343,7 @@ def main() -> None:
         summary(diag)
         fig1_convergence(diag, out)
         fig2_why_above_1(diag, out, args.llm)
-        fig3_anisotropy(diag, out)
+        fig3_above_chance(diag, out)
     if grid:
         fig4_families(grid, out, args.family_llm)
     vv = args.root / "vision_vision" / "vision_vision.npz"
