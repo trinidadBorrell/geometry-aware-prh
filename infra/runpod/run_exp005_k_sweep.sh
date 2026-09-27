@@ -4,7 +4,7 @@
 #   1. full val grid (all cached LLMs x ViTs), mKNN + CKNNA at every k, CKA once per pair
 #   2. vision-vision: last-block CLS of every ViT against every other
 # Launch detached:
-#   ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && WORKERS=8 nohup bash infra/runpod/run_exp005_k_sweep.sh > /workspace/results/oddharak/exp-005.log 2>&1 &"
+#   ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && WORKERS=10 nohup bash infra/runpod/run_exp005_k_sweep.sh > /workspace/results/oddharak/exp-005.log 2>&1 &"
 set -uo pipefail
 . /etc/rp_environment
 export PATH="$HOME/.local/bin:$PATH"
@@ -22,8 +22,7 @@ job() {
   mkdir -p "$OUT"
   git rev-parse HEAD > "$OUT/git_sha.txt"
   uv run python "$SWEEP" --out "$OUT/grid" --workers "$WORKERS"
-  uv run python "$SWEEP" --out "$OUT/diagnostics" --llms diag --lvms diag --diagnostics \
-    --workers "$WORKERS"
+  uv run python "$SWEEP" --out "$OUT/vision_vision" --vision-vision
 }
 
 ( job ); status=$?
