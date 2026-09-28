@@ -169,8 +169,8 @@ if __name__ == "__main__":
     parser.add_argument("--dist",           type=float, default=0.0)
 
     parser.add_argument("--input_dir",      type=str, default="/workspace/hf")
-    parser.add_argument("--input_dir_x",      type=str, default=None)
-    parser.add_argument("--input_dir_y",      type=str, default=None)
+    parser.add_argument("--input_file_x",      type=str, default=None)
+    parser.add_argument("--input_file_y",      type=str, default=None)
     parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/alignment")
     parser.add_argument("--precise",        action="store_true")
     parser.add_argument("--force_remake",   action="store_true")
@@ -194,18 +194,13 @@ if __name__ == "__main__":
         exit()
 
 
-    if args.input_dir_x is not None:
-        assert args.input_dir_y is not None
-
-        def _single_feature_file(d):
-            files = glob.glob(os.path.join(d, "*.pt")) + glob.glob(os.path.join(d, "*.pth"))
-            assert len(files) == 1, f"expected exactly one feature file in {d}, found {files}"
-            return files[0]
-
-        models_x_paths = [_single_feature_file(args.input_dir_x)]
-        models_y_paths = [_single_feature_file(args.input_dir_y)]
-        models_x = [(os.path.splitext(os.path.basename(models_x_paths[0]))[0], args.modality_x)]
-        models_y = [(os.path.splitext(os.path.basename(models_y_paths[0]))[0], args.modality_y)]
+    if args.input_file_x is not None:
+        assert args.input_file_x is not None and args.input_file_y is not None, \
+            "pass both --input_file_x and --input_file_y"
+        models_x_paths = [args.input_file_x]
+        models_y_paths = [args.input_file_y]
+        models_x = [(args.input_file_x, args.modality_x)]
+        models_y = [(args.input_file_y, args.modality_y)]
     else:
         llm_models, lvm_models = get_models(args.modelset, modality='all')
 
