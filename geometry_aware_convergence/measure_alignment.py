@@ -168,6 +168,8 @@ if __name__ == "__main__":
     parser.add_argument("--dist",           type=float, default=0.0)
 
     parser.add_argument("--input_dir",      type=str, default="/workspace/hf")
+    parser.add_argument("--input_dir_x",      type=str, default=None)
+    parser.add_argument("--input_dir_y",      type=str, default=None)
     parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/alignment")
     parser.add_argument("--precise",        action="store_true")
     parser.add_argument("--force_remake",   action="store_true")
@@ -189,21 +191,35 @@ if __name__ == "__main__":
     if os.path.exists(save_path) and not args.force_remake:
         print(f"alignment already exists at {save_path}")
         exit()
-    
-    llm_models, lvm_models = get_models(args.modelset, modality='all')
 
-    def _models_for(modality):
-        if modality == "language":
-            return [(m, "language") for m in llm_models]
-        elif modality == "vision":
-            return [(m, "vision") for m in lvm_models]
-        return [(m, "language") for m in llm_models] + [(m, "vision") for m in lvm_models]
 
-    models_x = _models_for(args.modality_x)
-    models_y = _models_for(args.modality_y)
+    if args.input_dir_x is not None:
+        assert args.input_dir_y is not None
 
-    models_x_paths = [to_feature_filename(args.input_dir, mod, m) for m, mod in models_x]
-    models_y_paths = [to_feature_filename(args.input_dir, mod, m) for m, mod in models_y]
+        def _single_feature_file(d):
+            files = glob.glob(os.path.join(d, "*.pt")) + glob.glob(os.path.join(d, "*.pth"))
+            assert len(files) == 1, f"expected exactly one feature file in {d}, found {files}"
+            return files[0]
+
+        models_x_paths = [_single_feature_file(args.input_dir_x)]
+        models_y_paths = [_single_feature_file(args.input_dir_y)]
+        models_x = [(os.path.splitext(os.path.basename(models_x_paths[0]))[0], args.modality_x)]
+        models_y = [(os.path.splitext(os.path.basename(models_y_paths[0]))[0], args.modality_y)]
+    else:
+        llm_models, lvm_models = get_models(args.modelset, modality='all')
+
+        def _models_for(modality):
+            if modality == "language":
+                return [(m, "language") for m in llm_models]
+            elif modality == "vision":
+                return [(m, "vision") for m in lvm_models]
+            return [(m, "language") for m in llm_models] + [(m, "vision") for m in lvm_models]
+
+        models_x = _models_for(args.modality_x)
+        models_y = _models_for(args.modality_y)
+
+        models_x_paths = [to_feature_filename(args.input_dir, mod, m) for m, mod in models_x]
+        models_y_paths = [to_feature_filename(args.input_dir, mod, m) for m, mod in models_y]
     
     for fn in models_x_paths + models_y_paths:
         assert os.path.exists(fn), fn
