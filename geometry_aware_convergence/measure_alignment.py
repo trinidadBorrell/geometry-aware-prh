@@ -46,7 +46,7 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
             kwargs = {}
             if 'knn' in metric:
                 kwargs['topk'] = topk
-            if 'knd' in metric:
+            if 'nd' in metric:
                 assert dist is not None, 'dist must be defined'
                 kwargs['cutoff'] = dist
 
@@ -119,6 +119,7 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calib
                 y_feats, x_feats,
                 metric=metric, topk=topk, dist=dist,
                 null_calibration=null_calibration, 
+                normalize=True,
                 num_permutations=num_permutations,
                 quantile=quantile
             )
@@ -145,7 +146,7 @@ def to_alignment_filename(output_dir, metric, topk, dist, null_calibrate):
     dist_flag = f'_d{dist}' if dist > 0 else ''
     save_path = os.path.join(
         output_dir,
-        f"{metric}_k{topk}{dist_flag}.npy" if ('knn' in metric or 'knd' in metric) else f"{metric}.npy"
+        f"{metric}_k{topk}{dist_flag}.npy" if ('knn' in metric or 'nd' in metric) else f"{metric}.npy"
     )
     return save_path
 
@@ -211,7 +212,7 @@ if __name__ == "__main__":
     print(f"metric: \t{args.metric}")
     if 'knn' in args.metric:
         print(f"topk:\t{args.topk}")
-    if 'knd' in args.metric:
+    if 'nd' in args.metric:
         print(f"dist:\t{args.dist}")
 
     

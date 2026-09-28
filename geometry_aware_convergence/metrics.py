@@ -19,6 +19,7 @@ class AlignmentMetrics:
     SUPPORTED_METRICS = [
         "cycle_knn",
         "mutual_knn",
+        "mutual_nd",
         "lcs_knn",
         "cka",
         "unbiased_cka",
@@ -85,6 +86,23 @@ class AlignmentMetrics:
         acc = (lvm_mask * llm_mask).sum(dim=1) / topk
         
         return acc.mean().item()
+    
+    @staticmethod
+    def mutual_nd(feats_A, feats_B, cutoff):
+        K = feats_A @ feats_A.T
+        L = feats_B @ feats_B.T
+        K_hat = K.clone().fill_diagonal_(float("-inf"))
+        L_hat = L.clone().fill_diagonal_(float("-inf"))
+
+        mask_K = (K_hat >= cutoff).float()
+        mask_L = (L_hat >= cutoff).float()
+
+        inter = (mask_K * mask_L).sum(dim=1)
+        total = (mask_K + mask_L).sum(dim=1)
+        valid = total > 0
+        if not valid.any():
+            return 0.0
+        return (2 * inter[valid] / total[valid]).mean().item()
     
     
     @staticmethod
@@ -417,7 +435,7 @@ if __name__ == "__main__":
 
     print(f'Total time: {time.time() - t0:.2f}s')
 
-KERNEL_METRICS = {"cka", "unbiased_cka", "cknna", "mutual_knn"}
+KERNEL_METRICS = {"cka", "unbiased_cka", "cknna", "mutual_knn", "cknda"}
 
 def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permutations=200, quantile=0.95, unbiased=True):
 
@@ -527,6 +545,21 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
                 sim_ll = similarity_cknda(L_perm, L_perm, dist)
                         
                 score = sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
+
+            elif metric_name == 'mutual_nd':
+                K_hat = K.clone().fill_diagonal_(float("-inf"))
+                L_hat = L.clone().fill_diagonal_(float("-inf"))
+        
+                mask_K = (K_hat >= dist).float()
+                mask_L = (L_hat >= dist).float()
+        
+                inter = (mask_K * mask_L).sum(dim=1)
+                total = (mask_K + mask_L).sum(dim=1)
+                valid = total > 0
+                if not valid.any():
+                    score  = 0.0
+                else:
+                    score = (2 * inter[valid] / total[valid]).mean().item()
 
             elif metric_name == "mutual_knn":
                 knn_B = (

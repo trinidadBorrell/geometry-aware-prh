@@ -1,5 +1,4 @@
-pip install -r platonic-rep/requirements.txt
-pip install -r Aristotelian/requirements.txt
+pip install -r requirements.txt
 
 cd geometry_aware_convergence
 # rm: lcs_knn svcca edit_distance_knn
@@ -17,7 +16,7 @@ cd geometry_aware_convergence
 # done
 
 
-DISTS=(0.95 0.9 0.8 0.7 0.6)
+DISTS=(0.95 0.9 0.8 0.7)
 
 for dist in "${DISTS[@]}"; do
     python measure_alignment.py --modality_x all --modality_y all --metric cknda --dist "$dist"
