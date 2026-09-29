@@ -54,7 +54,7 @@ in both models); and U-centring a masked, non-PSD matrix loses the Cauchy-Schwar
 ```bash
 ssh root@<ip> -p <port> 'BRANCH=oddharak bash -s' < infra/runpod/setup_pod.sh
 ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && AUTO_TERMINATE=1 nohup bash infra/runpod/run_exp007_exp008.sh > /workspace/results/oddharak/exp-007-008.log 2>&1 < /dev/null &"
-uv run python experiments/exp-007-cknna-variants/plot.py --root results/exp-007-cknna-variants
+uv run python experiments/exp-007-cknna-variants/plot.py --root results/exp-007-cknna-variants \n    --calibrated results/exp-008-cknna-null/calibrated_pairs.jsonl
 ```
 
 ## Results
@@ -97,3 +97,12 @@ Linear CKA: 0.39 (unbiased CKA: 0.31).
   `eq36` reach 1.56 and 1.68; the MAE x MAE pairs are the highest (mean ~1.5 near k = 950).
 
 Which parts of these curves are above chance is exp-008.
+
+**Alignment vs LLM size (fig3_by_llm_k{10,200,500,1023}).** Groger et al. Fig. 19 layout, made
+from exp-008's calibrated output (no new compute): one panel per vision family, one line per
+ViT size, LLMs grouped by family and ordered by size, rows = the four definitions, raw (dotted)
+and null-corrected (solid; g for `paper` / `centred`, max(raw - tau, 0) for `code` / `eq36`).
+At k = 10 all four rows look the same: alignment grows with LLM size and with ViT size, CLIP
+and DINOv2 highest, MAE lowest. At k = 500 the raw scores are flat in LLM size for every
+definition; after null correction only `centred` keeps the rising trend (clearest for CLIP and
+DINOv2), `paper` loses it and reverses the ViT-size order, and `code` / `eq36` are near 0.
