@@ -80,6 +80,8 @@ def panel(ax, ks, curves: dict[str, np.ndarray], cka: np.ndarray) -> None:
         label, color = METRICS[name]
         ax.fill_between(ks, y.min(0), y.max(0), color=color, alpha=0.12, lw=0)
         ax.plot(ks, y.mean(0), color=color, label=label)
+    # CKA does not depend on k, but it varies across pairs: same min..max band, constant in k
+    ax.axhspan(cka.min(), cka.max(), color=INK, alpha=0.07, lw=0)
     ax.axhline(cka.mean(), color=INK, ls="--", lw=1.5, label="linear CKA")
     xaxis(ax)
 

@@ -99,8 +99,9 @@ def fig1_convergence(recs: list[dict], out: Path) -> None:
             y = np.stack([series(r, key) for r in rs])
             ax.fill_between(ks, y.min(0), y.max(0), color=METRIC_COLOR[key], alpha=0.15, lw=0)
             ax.plot(ks, y.mean(0), color=METRIC_COLOR[key], label=label)
-        cka = np.mean([r["cka"] for r in rs])
-        ax.axhline(cka, color=METRIC_COLOR["cka"], ls="--", lw=1.5, label="linear CKA")
+        cka = np.array([r["cka"] for r in rs])
+        ax.axhspan(cka.min(), cka.max(), color=METRIC_COLOR["cka"], alpha=0.15, lw=0)
+        ax.axhline(cka.mean(), color=METRIC_COLOR["cka"], ls="--", lw=1.5, label="linear CKA")
         ax.plot(ks, ks / ks[-1], color=INK_MUTED, ls=":", lw=1, label="mutual kNN chance k/(n-1)")
         ax.set_title(short(lvm), color=INK)
         _xaxis(ax)
@@ -154,8 +155,9 @@ def fig3_vision_vision(path: Path, out: Path) -> None:
             color = METRIC_COLOR["mutual_knn" if key == "mknn" else key]
             ax.fill_between(ks, y.min(1), y.max(1), color=color, alpha=0.15, lw=0)
             ax.plot(ks, y.mean(1), color=color, label=label)
-        cka = d["cka"][iu][sel].mean()
-        ax.axhline(cka, color=METRIC_COLOR["cka"], ls="--", lw=1.5, label="linear CKA")
+        cka = d["cka"][iu][sel]
+        ax.axhspan(cka.min(), cka.max(), color=METRIC_COLOR["cka"], alpha=0.15, lw=0)
+        ax.axhline(cka.mean(), color=METRIC_COLOR["cka"], ls="--", lw=1.5, label="linear CKA")
         ax.set_title(f"{name} ({int(sel.sum())} pairs)", color=INK)
         _xaxis(ax)
     axes[0].set_ylabel("score, last-block CLS")
