@@ -30,6 +30,8 @@ job() {
 ( job ); status=$?
 echo "job exit status: $status"
 if [ "$status" -eq 0 ] && [ "$AUTO_TERMINATE" = "1" ]; then
+  # runpodctl config fails on this image unless its config file exists (2026-09-29 run)
+  mkdir -p ~/.runpod && touch ~/.runpod/.runpod.yaml
   runpodctl config --apiKey "$RUNPOD_API_KEY" >/dev/null && runpodctl remove pod "$RUNPOD_POD_ID"
 fi
 exit "$status"

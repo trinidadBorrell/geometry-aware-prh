@@ -25,8 +25,9 @@ Cauchy-Schwarz bounds it by the denominators. At k = n-1 it is the row-centred C
 The released code (`platonic-rep/metrics.py`, `AlignmentMetrics.cknna`) computes something
 different. It masks the *raw* kernel first (non-neighbours set to 0) and then centres the masked
 matrix inside `hsic_unbiased`. The code gives no reason; most likely the existing HSIC routine was
-reused. The two agree at k = n (no mask) and nearly agree at small k (the paper's headline uses
-k = 10). At large k, however, the inserted zeros dominate the centring whenever the features are
+reused. The two nearly agree at small k (the paper's headline uses k = 10). They do not agree at
+k = n - 1: the code then gives unbiased CKA and the formula the row-centred sum of Eq. 15
+(exp-007). At large k, however, the inserted zeros dominate the centring whenever the features are
 anisotropic (all cosines ~ c > 0), and the code's score exceeds 1. On a first pass of this
 experiment it reached 1.0-2.4 at k = 700-950, and the permutation null reached the same values, so
 those numbers are not alignment. This is also where the "CKNNA > 1 for MAE around k ~ 500"
@@ -55,6 +56,12 @@ uv run python experiments/exp-005-cknna-large-k/plot.py --root results/exp-005-c
 ```
 
 ## Results
+
+> **Update (exp-007, exp-008):** most of the CKNNA peak at k = 400-600 below is the chance
+> level of the formula (null mean 0.32-0.38 there). After permutation calibration the published
+> formula has its minimum at k = 600-800, and a properly centred CKNNA rises almost
+> monotonically from local alignment to unbiased CKA. The "interpolates between local and
+> global" reading below should be taken from exp-008, not from the raw curve.
 
 Run 2026-09-27, commit `12db226`, CPU pod cpu5c x8 (16 GB; two restarts with fewer workers
 after out-of-memory kills, resumed from the per-pair log), all 170 pairs. Raw outputs are in
