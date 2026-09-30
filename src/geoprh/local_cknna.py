@@ -15,6 +15,11 @@ diagonal, unbiased HSIC of the block is
 
 so with all blocks stacked as rows of B, every term is a product B @ (n x n matrix) followed by a
 row-wise dot with B: five n^3 products per layer pair give all n local scores.
+
+Everything here runs in float64. The blocks are small and tight (a point and its nearest
+neighbours, cosines ~0.9), so the three HSIC terms nearly cancel; in float32 a per-point score can
+be off by 30 at k = 50 and exceed 1, which it cannot in exact arithmetic (unbiased HSIC is an inner
+product of U-centred matrices, so each local CKA is bounded by 1).
 """
 
 from __future__ import annotations
@@ -47,7 +52,7 @@ class LocalGram:
     """Zero-diagonal Gram of one layer and its square, for the local metrics."""
 
     def __init__(self, K: torch.Tensor):
-        self.Kt = K.clone()
+        self.Kt = K.to(torch.float64, copy=True)
         self.Kt.diagonal(dim1=-2, dim2=-1).fill_(0)
         self.KK = self.Kt * self.Kt
 
@@ -60,7 +65,8 @@ def local_scores(
     mK, mL: k-NN masks (self excluded) broadcastable to each other; gk, gl: the two layers.
     """
     n = mK.shape[-1]
-    eye = torch.eye(n, device=mK.device)
+    mK, mL = mK.to(gk.Kt.dtype), mL.to(gk.Kt.dtype)
+    eye = torch.eye(n, device=mK.device, dtype=mK.dtype)
     KL = gk.Kt * gl.Kt
     W = mK * mL
     mutual = _local_cka(W + eye, gk.Kt, gl.Kt, gk.KK, gl.KK, KL)

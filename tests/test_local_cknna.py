@@ -69,13 +69,15 @@ def test_matches_emily_and_union_loop(pair, k):
     sx, sy = cv.Stack([x]), cv.Stack([y])
     ax, ay = sx.at_k(k), sy.at_k(k)
     s = lc.local_scores(ax.m[0], ay.m[0], lc.LocalGram(sx.K[0]), lc.LocalGram(sy.K[0]))
-    ref = emily_cknna_local(x, y, k, per_point=True)
+    ref = emily_cknna_local(x.double(), y.double(), k, per_point=True)
     np.testing.assert_array_equal(np.isnan(s["mutual"].numpy()), np.isnan(ref))
-    np.testing.assert_allclose(s["mutual"].numpy(), ref, rtol=2e-3, atol=1e-4, equal_nan=True)
+    np.testing.assert_allclose(s["mutual"].numpy(), ref, rtol=1e-5, atol=1e-6, equal_nan=True)
     red = lc.reduce(s)
     if not np.isnan(ref).all():
         assert float(red["local_mutual"]) == pytest.approx(np.nanmean(ref), rel=2e-3, abs=1e-4)
-    np.testing.assert_allclose(s["union"].numpy(), _union_loop(x, y, k), rtol=2e-3, atol=1e-4)
+    np.testing.assert_allclose(
+        s["union"].numpy(), _union_loop(x.double(), y.double(), k), rtol=1e-5, atol=1e-6
+    )
 
 
 def test_full_k_is_unbiased_cka(pair):
@@ -98,3 +100,18 @@ def test_rowwise_sums_to_global(pair):
     glob = cv.per_k_scores(ax, ay, ay.right())
     assert float(r["mknn"].mean()) == pytest.approx(float(glob["mknn"][0, 0]), rel=1e-6)
     assert float(r["centred"].abs().max()) <= 1 + 1e-5
+
+
+def test_bounded_on_tight_neighbourhoods():
+    """Strongly anisotropic features (cosines ~0.9): every local score stays within [-1, 1]."""
+    g = torch.Generator().manual_seed(1)
+    x = torch.nn.functional.normalize(torch.randn(200, 64, generator=g) * 0.3 + 3.0, dim=-1)
+    y = torch.nn.functional.normalize(torch.randn(200, 48, generator=g) * 0.3 + 3.0, dim=-1)
+    sx, sy = cv.Stack([x]), cv.Stack([y])
+    for k in (10, 25, 50, 100):
+        ax, ay = sx.at_k(k), sy.at_k(k)
+        s = lc.local_scores(ax.m[0], ay.m[0], lc.LocalGram(sx.K[0]), lc.LocalGram(sy.K[0]))
+        for v in s.values():
+            v = v[~torch.isnan(v)]
+            if v.numel():
+                assert float(v.abs().max()) <= 1 + 1e-9
