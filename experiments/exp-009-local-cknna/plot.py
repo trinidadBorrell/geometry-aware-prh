@@ -137,7 +137,7 @@ def fig3_distributions(recs: list[dict], root: Path, out: Path, dist_ks: list[in
         ax.set_xticks(range(len(dist_ks)))
         ax.set_xticklabels([str(k) for k in dist_ks])
         ax.set_xlabel("k")
-        ax.set_title(label, color=INK)
+        ax.set_title(label, color=INK, pad=14 if m == "local_mutual" else 6)
         ax.axhline(0, color=INK_MUTED, lw=0.8)
         if m == "local_mutual":
             for i in keep:
