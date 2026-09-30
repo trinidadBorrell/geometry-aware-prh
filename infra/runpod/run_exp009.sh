@@ -11,12 +11,15 @@ PERSON=${PERSON:-oddharak}
 OUT=/workspace/results/$PERSON/exp-009-local-cknna
 PERMUTATIONS=${PERMUTATIONS:-200}
 AUTO_TERMINATE=${AUTO_TERMINATE:-0}
+# default: 5 LLMs (0.56B-13B, three families) x one large ViT per vision family = 25 pairs
+LLMS=${LLMS:-bigscience/bloomz-560m,bigscience/bloomz-7b1,openlm-research/open_llama_3b,openlm-research/open_llama_13b,huggyllama/llama-13b}
+LVMS=${LVMS:-vit_large_patch16_224.augreg_in21k,vit_large_patch16_224.mae,vit_large_patch14_dinov2.lvd142m,vit_large_patch14_clip_224.laion2b,vit_large_patch14_clip_224.laion2b_ft_in12k}
 
 job() {
   set -e
   mkdir -p "$OUT"
   git rev-parse HEAD > "$OUT/git_sha.txt"
-  uv run python experiments/exp-009-local-cknna/run.py --out "$OUT" --permutations "$PERMUTATIONS"
+  uv run python experiments/exp-009-local-cknna/run.py --out "$OUT" --permutations "$PERMUTATIONS"     --llms "$LLMS" --lvms "$LVMS"
 }
 
 ( job ); status=$?
