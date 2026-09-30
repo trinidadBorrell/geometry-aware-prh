@@ -115,3 +115,33 @@ def test_bounded_on_tight_neighbourhoods():
             v = v[~torch.isnan(v)]
             if v.numel():
                 assert float(v.abs().max()) <= 1 + 1e-9
+
+
+def test_knn_shift_is_exact_and_fixes_float32():
+    """Subtracting shift_a + shift_b leaves every local CKA unchanged (exact in float64), and
+    the shifted float32 computation matches float64 closely on tight neighbourhoods."""
+    g = torch.Generator().manual_seed(2)
+    shared = torch.randn(300, 6, generator=g)
+    x = shared @ torch.randn(6, 64, generator=g) + 0.5 * torch.randn(300, 64, generator=g)
+    y = shared @ torch.randn(6, 48, generator=g) + 0.5 * torch.randn(300, 48, generator=g)
+    x = torch.nn.functional.normalize(x + 4.0, dim=-1)
+    y = torch.nn.functional.normalize(y + 4.0, dim=-1)
+    sx, sy = cv.Stack([x.double()]), cv.Stack([y.double()])
+    for k in (10, 30, 100):
+        ax, ay = sx.at_k(k), sy.at_k(k)
+        ref = lc.local_scores(ax.m[0], ay.m[0], lc.LocalGram(sx.K[0]), lc.LocalGram(sy.K[0]))
+        u, v = lc.knn_shift(sx.K, sx.order, k)[0], lc.knn_shift(sy.K, sy.order, k)[0]
+        exact = lc.local_scores(
+            ax.m[0], ay.m[0], lc.LocalGram(sx.K[0], u), lc.LocalGram(sy.K[0], v)
+        )
+        fast = lc.local_scores(
+            ax.m[0],
+            ay.m[0],
+            lc.LocalGram(sx.K[0], u, torch.float32),
+            lc.LocalGram(sy.K[0], v, torch.float32),
+        )
+        for key in ("mutual", "union"):
+            np.testing.assert_allclose(exact[key], ref[key], rtol=0, atol=1e-6, equal_nan=True)
+            np.testing.assert_allclose(
+                fast[key].double(), ref[key], rtol=0, atol=1e-3, equal_nan=True
+            )

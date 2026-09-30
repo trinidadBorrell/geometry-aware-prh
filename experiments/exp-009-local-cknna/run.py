@@ -54,19 +54,29 @@ class Model:
     def __init__(self, layers: list[torch.Tensor], device: str):
         self.layers = layers
         self.stack = cv.Stack(layers, device)
-        self.local = lc.LocalGram(self.stack.K)
         self.device = device
+        self._local: tuple[int, lc.LocalGram] | None = None
+
+    def local_at(self, k: int) -> lc.LocalGram:
+        """float32 Grams shifted by half each point's k-NN similarity (exact for the local CKA,
+        and ~1000x more accurate in float32 than unshifted; see geoprh.local_cknna)."""
+        if self._local is None or self._local[0] != k:
+            self._local = None
+            shift = lc.knn_shift(self.stack.K, self.stack.order, k)
+            self._local = (k, lc.LocalGram(self.stack.K, shift, torch.float32))
+        return self._local[1]
 
     def single(self, i: int) -> Model:
         return Model([self.layers[i]], self.device)
 
 
-def local_grid(a: Model, b: Model, ak: cv.AtK, bk: cv.AtK) -> dict[str, torch.Tensor]:
+def local_grid(a: Model, b: Model, ak: cv.AtK, bk: cv.AtK, k: int) -> dict[str, torch.Tensor]:
     """[La, Lb] local_mutual, local_union and coverage (one bmm batch per vision layer)."""
     rows = {name: [] for name in (*LOCAL, "coverage")}
+    ga, gb = a.local_at(k), b.local_at(k)
     for i in range(len(a.stack)):
-        gk = _gram(a.local.Kt[i], a.local.KK[i])
-        red = lc.reduce(lc.local_scores(ak.m[i], bk.m, gk, b.local))
+        gk = _gram(ga.Kt[i], ga.KK[i])
+        red = lc.reduce(lc.local_scores(ak.m[i], bk.m, gk, gb))
         for name in rows:
             rows[name].append(red[name])
     return {name: torch.stack(v) for name, v in rows.items()}
@@ -87,10 +97,11 @@ def at_pair(a: Model, b: Model, ak: cv.AtK, bk: cv.AtK, k: int, perm) -> dict:
     """All metrics for single-layer models a, b (b relabelled by perm), plus per-point arrays."""
     right = bk.right() if perm is None else bk.permuted(perm)
     out = {name: float(v[0, 0]) for name, v in cv.per_k_scores(ak, bk, right).items()}
-    mL, Kt, KK, Lc = bk.m[0], b.local.Kt[0], b.local.KK[0], b.stack.Kc[0]
+    ga, gb = a.local_at(k), b.local_at(k)
+    mL, Kt, KK, Lc = bk.m[0], gb.Kt[0], gb.KK[0], b.stack.Kc[0]
     if perm is not None:
         mL, Kt, KK, Lc = (x[perm][:, perm] for x in (mL, Kt, KK, Lc))
-    pts = lc.local_scores(ak.m[0], mL, _gram(a.local.Kt[0], a.local.KK[0]), _gram(Kt, KK))
+    pts = lc.local_scores(ak.m[0], mL, _gram(ga.Kt[0], ga.KK[0]), _gram(Kt, KK))
     red = lc.reduce(pts)
     rows = lc.rowwise(ak.m[0], mL, a.stack.Kc[0], Lc, k)
     out.update({name: float(red[name]) for name in (*LOCAL, "coverage")})
@@ -115,7 +126,7 @@ def pair_task(a: Model, b: Model, ks: list[int], perms: torch.Tensor) -> tuple[d
     for k in ks:
         ak, bk = a.stack.at_k(k), b.stack.at_k(k)
         mats = dict(cv.per_k_scores(ak, bk, bk.right()))
-        mats.update(local_grid(a, b, ak, bk))
+        mats.update(local_grid(a, b, ak, bk, k))
         del ak, bk
         rec = {"k": k}
         by_pair: dict[tuple[int, int], list[str]] = {}

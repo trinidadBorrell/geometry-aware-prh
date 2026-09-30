@@ -49,12 +49,32 @@ def _local_cka(B: torch.Tensor, Kt, Lt, KK, LL, KL) -> torch.Tensor:
 
 
 class LocalGram:
-    """Zero-diagonal Gram of one layer and its square, for the local metrics."""
+    """Zero-diagonal Gram of one layer and its square, for the local metrics.
 
-    def __init__(self, K: torch.Tensor):
-        self.Kt = K.to(torch.float64, copy=True)
+    ``shift`` ([..., n]) subtracts shift_a + shift_b from every off-diagonal entry. Unbiased HSIC
+    of any block is exactly invariant to such additive row + column effects (U-centring removes
+    them), so the scores do not change; with shift_a = half of a's mean similarity to its k
+    nearest neighbours it removes the common level (~0.9) of a tight neighbourhood, which is
+    what makes the float32 computation lose precision.
+    """
+
+    def __init__(
+        self,
+        K: torch.Tensor,
+        shift: torch.Tensor | None = None,
+        dtype: torch.dtype = torch.float64,
+    ):
+        self.Kt = K.to(dtype, copy=True)
+        if shift is not None:
+            shift = shift.to(dtype)
+            self.Kt -= shift[..., :, None] + shift[..., None, :]
         self.Kt.diagonal(dim1=-2, dim2=-1).fill_(0)
         self.KK = self.Kt * self.Kt
+
+
+def knn_shift(K: torch.Tensor, order: torch.Tensor, k: int) -> torch.Tensor:
+    """Half of each point's mean similarity to its k nearest neighbours ([..., n])."""
+    return 0.5 * K.gather(-1, order[..., :k].long()).mean(-1)
 
 
 def local_scores(
