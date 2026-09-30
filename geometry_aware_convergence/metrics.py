@@ -1,5 +1,6 @@
 import torch
 import torchaudio.functional as TAF
+from math import sqrt
 
 import numpy as np
 from sklearn.cross_decomposition import CCA
@@ -246,6 +247,104 @@ class AlignmentMetrics:
         sim_ll = similarity(L, L, topk)
                 
         return sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
+
+    @staticmethod
+    def cknna_local(feats_A, feats_B, topk=None, unbiased=True, min_neighbors=None):
+        n = feats_A.shape[0]
+        if topk is None:
+            topk = n - 1
+        if topk < 2:
+            raise ValueError("cknna_local requires topk >= 2")
+
+        if min_neighbors is None:
+            min_neighbors = 4 if unbiased else 2
+
+        K = feats_A @ feats_A.T
+        L = feats_B @ feats_B.T
+        device = feats_A.device
+        hsic_fn = hsic_unbiased if unbiased else hsic_biased
+
+        K_hat = K.clone().fill_diagonal_(float("-inf"))
+        L_hat = L.clone().fill_diagonal_(float("-inf"))
+
+        _, topk_K_indices = torch.topk(K_hat, topk, dim=1)  # (n, topk)
+        _, topk_L_indices = torch.topk(L_hat, topk, dim=1)  # (n, topk)
+
+        local_scores = []
+
+        for i in range(n):
+            neighbors_K = topk_K_indices[i]
+            neighbors_L = topk_L_indices[i]
+            mutual = torch.tensor(
+                list(set(neighbors_K.tolist()) & set(neighbors_L.tolist())),
+                dtype=torch.long, device=device,
+            )
+
+            if len(mutual) < min_neighbors:
+                continue
+
+            block = torch.cat([torch.tensor([i], device=device), mutual])
+
+            K_block = K[block][:, block]
+            L_block = L[block][:, block]
+
+            hsic_kl = hsic_fn(K_block, L_block)
+            hsic_kk = hsic_fn(K_block, K_block)
+            hsic_ll = hsic_fn(L_block, L_block)
+
+            score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6).item()
+
+            local_scores.append(score_i)
+
+        if len(local_scores) == 0:
+            return 0.0
+
+        return float(np.mean(local_scores))
+
+    def cknda_local(feats_A, feats_B, cutoff=None, unbiased=True, min_neighbors=None):
+            n = feats_A.shape[0]
+    
+            K = feats_A @ feats_A.T
+            L = feats_B @ feats_B.T
+            device = feats_A.device
+            hsic_fn = hsic_unbiased if unbiased else hsic_biased
+    
+            K_hat = K.clone().fill_diagonal_(float("-inf"))
+            L_hat = L.clone().fill_diagonal_(float("-inf"))
+
+            mask_K = K_hat >= cutoff 
+            mask_L = L_hat >= cutoff
+    
+            local_scores = []
+    
+            for i in range(n):
+                neighbors_K = mask_K[i].nonzero(as_tuple=True)[0]
+                neighbors_L = mask_L[i].nonzero(as_tuple=True)[0]
+                mutual = torch.tensor(
+                    list(set(neighbors_K.tolist()) & set(neighbors_L.tolist())),
+                    dtype=torch.long, device=device,
+                )
+    
+                if len(mutual) < min_neighbors:
+                    continue
+    
+                block = torch.cat([torch.tensor([i], device=device), mutual])
+    
+                K_block = K[block][:, block]
+                L_block = L[block][:, block]
+    
+                hsic_kl = hsic_fn(K_block, L_block)
+                hsic_kk = hsic_fn(K_block, K_block)
+                hsic_ll = hsic_fn(L_block, L_block)
+    
+                score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6).item()
+    
+                local_scores.append(score_i)
+    
+            if len(local_scores) == 0:
+                return 0.0
+    
+            return float(np.mean(local_scores))
 
 
     @staticmethod
