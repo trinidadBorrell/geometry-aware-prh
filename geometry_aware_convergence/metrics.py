@@ -294,7 +294,7 @@ class AlignmentMetrics:
             hsic_kk = hsic_fn(K_block, K_block)
             hsic_ll = hsic_fn(L_block, L_block)
 
-            score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6).item()
+            score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6)
 
             local_scores.append(score_i)
 
@@ -336,7 +336,7 @@ class AlignmentMetrics:
                 hsic_kk = hsic_fn(K_block, K_block)
                 hsic_ll = hsic_fn(L_block, L_block)
     
-                score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6).item()
+                score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6)
     
                 local_scores.append(score_i)
     
