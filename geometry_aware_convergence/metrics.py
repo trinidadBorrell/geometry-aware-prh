@@ -301,7 +301,7 @@ class AlignmentMetrics:
         if len(local_scores) == 0:
             return 0.0
 
-        return float(np.mean(local_scores.cpu()))
+        return float(np.mean(local_scores).cpu())
 
     def cknda_local(feats_A, feats_B, cutoff=None, unbiased=True, min_neighbors=None):
             n = feats_A.shape[0]
@@ -349,7 +349,7 @@ class AlignmentMetrics:
             if len(local_scores) == 0:
                 return 0.0
     
-            return float(np.mean(local_scores.cpu()))
+            return float(np.mean(local_scores).cpu())
 
 
     @staticmethod
