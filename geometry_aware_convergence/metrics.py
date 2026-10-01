@@ -291,8 +291,8 @@ class AlignmentMetrics:
             L_block = L[block][:, block]
 
             hsic_kl = hsic_fn(K_block, L_block)
-            hsic_kk = hsic_fn(K_block, K_block)
-            hsic_ll = hsic_fn(L_block, L_block)
+            hsic_kk = hsic_fn(K_block, K_block).clamp(min=0)
+            hsic_ll = hsic_fn(L_block, L_block).clamp(min=0)
 
             score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6)
 
@@ -339,8 +339,8 @@ class AlignmentMetrics:
             L_block = L[block][:, block]
 
             hsic_kl = hsic_fn(K_block, L_block)
-            hsic_kk = hsic_fn(K_block, K_block)
-            hsic_ll = hsic_fn(L_block, L_block)
+            hsic_kk = hsic_fn(K_block, K_block).clamp(min=0)
+            hsic_ll = hsic_fn(L_block, L_block).clamp(min=0)
 
             score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6)
 
