@@ -296,12 +296,12 @@ class AlignmentMetrics:
 
             score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6)
 
-            local_scores.append(score_i)
+            local_scores.append(score_i.cpu())
 
         if len(local_scores) == 0:
             return 0.0
 
-        return float(np.mean(local_scores).cpu())
+        return float(np.mean(local_scores))
 
     def cknda_local(feats_A, feats_B, cutoff=None, unbiased=True, min_neighbors=None):
             n = feats_A.shape[0]
@@ -344,12 +344,12 @@ class AlignmentMetrics:
     
                 score_i = hsic_kl / (sqrt(hsic_kk * hsic_ll) + 1e-6)
     
-                local_scores.append(score_i)
+                local_scores.append(score_i.cpu())
     
             if len(local_scores) == 0:
                 return 0.0
     
-            return float(np.mean(local_scores).cpu())
+            return float(np.mean(local_scores))
 
 
     @staticmethod
