@@ -33,7 +33,7 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
         y_feats = [y_feats[:, j, :] for j in range(y_feats.shape[1])]
 
     best_alignment_indices = None
-    best_alignment_score = 0
+    best_alignment_score = None
 
     for i, x in enumerate(x_feats):
         for j, y in enumerate(y_feats):
@@ -56,7 +56,7 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
 
             score = metrics.AlignmentMetrics.measure(metric, x_aligned, y_aligned, **kwargs)
 
-            if score > best_alignment_score:
+            if best_alignment_score is None or score > best_alignment_score:
                 best_alignment_score = score
                 best_alignment_indices = (i, j)
     if null_calibration:
