@@ -301,7 +301,7 @@ class AlignmentMetrics:
         if len(local_scores) == 0:
             return 0.0
 
-        return float(np.mean(local_scores))
+        return float(np.mean(local_scores.cpu()))
 
     def cknda_local(feats_A, feats_B, cutoff=None, unbiased=True, min_neighbors=None):
             n = feats_A.shape[0]
@@ -318,6 +318,9 @@ class AlignmentMetrics:
             mask_L = L_hat >= cutoff
     
             local_scores = []
+
+            if min_neighbors is None:
+                min_neighbors = 4 if unbiased else 2
     
             for i in range(n):
                 neighbors_K = mask_K[i].nonzero(as_tuple=True)[0]
@@ -326,6 +329,9 @@ class AlignmentMetrics:
                     list(set(neighbors_K.tolist()) & set(neighbors_L.tolist())),
                     dtype=torch.long, device=device,
                 )
+
+                if len(mutual) < min_neighbors:
+                    continue
     
                 block = torch.cat([torch.tensor([i], device=device), mutual])
     
@@ -343,7 +349,7 @@ class AlignmentMetrics:
             if len(local_scores) == 0:
                 return 0.0
     
-            return float(np.mean(local_scores))
+            return float(np.mean(local_scores.cpu()))
 
 
     @staticmethod
