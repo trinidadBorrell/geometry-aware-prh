@@ -2,3 +2,4 @@
 progress/*
 alignment*
 *.zip
+*__pycache__*

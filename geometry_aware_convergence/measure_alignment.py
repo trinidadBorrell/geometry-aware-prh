@@ -16,7 +16,7 @@ from utils import *
 # Copied over from PRH directory.
 
 
-def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, normalize=True, null_calibration=False, num_permutations=200, quantile=0.95):
+def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, normalize=True, null_calibration=False, num_permutations=200, quantile=0.95, later_layers = False):
     """
     Uses different layer combinations of x_feats and y_feats to find the best alignment
     Args:
@@ -37,6 +37,9 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
 
     for i, x in enumerate(x_feats):
         for j, y in enumerate(y_feats):
+            # if using later layers only, restrict to relative depth > 0.5
+            if later_layers and i <= len(x_feats) // 2 or j <= len(y_feats) // 2:
+                continue
             if normalize:
                 x_aligned = F.normalize(x, p=2, dim=-1)
                 y_aligned = F.normalize(y, p=2, dim=-1)
@@ -70,7 +73,7 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
     return best_alignment_score, best_alignment_indices
 
     
-def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calibration, num_permutations, quantile, precise=True):
+def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calibration, num_permutations, quantile,  later_layers, precise=True):
     """
     Args:
         x_feat_paths: list of paths to x features
@@ -122,7 +125,8 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calib
                 null_calibration=null_calibration, 
                 normalize=True,
                 num_permutations=num_permutations,
-                quantile=quantile
+                quantile=quantile,
+                later_layers = later_layers
             )
             
             alignment_scores[i, j] = best_score
@@ -179,6 +183,8 @@ if __name__ == "__main__":
     parser.add_argument("--num-permutations", type=int, default=200)
     parser.add_argument("--quantile", type=float, default=0.95)
 
+    parser.add_argument("--later-layers",  action="store_true")
+
     args = parser.parse_args()
     
     if not args.precise:
@@ -234,7 +240,7 @@ if __name__ == "__main__":
     pprint(models_y_paths)
     
     print('\nmeasuring alignment')
-    alignment_scores, alignment_indices = compute_alignment(models_x_paths, models_y_paths, args.metric, args.topk, args.dist, args.null_calibrate, args.num_permutations, args.quantile, args.precise)
+    alignment_scores, alignment_indices = compute_alignment(models_x_paths, models_y_paths, args.metric, args.topk, args.dist, args.null_calibrate, args.num_permutations, args.quantile, args.later_layers, args.precise)
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     np.save(save_path, {
