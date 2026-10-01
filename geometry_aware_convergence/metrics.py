@@ -327,9 +327,6 @@ class AlignmentMetrics:
                     dtype=torch.long, device=device,
                 )
     
-                if len(mutual) < min_neighbors:
-                    continue
-    
                 block = torch.cat([torch.tensor([i], device=device), mutual])
     
                 K_block = K[block][:, block]
