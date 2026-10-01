@@ -1,0 +1,65 @@
+{
+  "name": "structured_metric_factors_v1",
+  "label": "Identity, one-sided, shared-PC and separate fits for exp(S) and regularised nonorthogonal factorizations",
+  "evaluation_status": "exploratory_heldout",
+  "q": 32,
+  "eig_bounds": [0.25, 4.0],
+  "singular_value_bounds": [0.5, 2.0],
+  "budgets_rho": [0.1, 0.4],
+  "seeds": [0, 1, 2],
+  "seed_0": "exact identity factors or exact zero S",
+  "pert_scale": 0.05,
+  "quarter_fraction": 0.25,
+  "n_updates": 120,
+  "validation_check": "every update including iteration zero; unpenalised full-validation excess, then lower total distortion, then earlier step",
+  "budget_continuation": "none",
+  "optim": {
+    "name": "Adam",
+    "lr": 0.03,
+    "grad_clip": 5.0,
+    "factor_b_path": "linear_solve_AinvT_D_Ainv",
+    "exp_s_b_path": "torch.matrix_exp",
+    "factor_projection": "column_normalise_absorb_into_D_then_svd_clip_then_feasible_backtracking",
+    "exp_s_projection": "eigh_outside_graph_then_scale"
+  },
+  "lambda_profiles": {
+    "strong": {"lambda_basis": 0.1, "lambda_off": 1.0},
+    "stronger": {"lambda_basis": 0.1, "lambda_off": 10.0}
+  },
+  "complexity_coef": 0.01,
+  "block_sizes": [2, 4],
+  "block_membership": "consecutive learned-basis coordinates [j*b, (j+1)*b)",
+  "modes": ["a_only", "shared_pc", "separate"],
+  "knn_k": 10,
+  "basis": "full_training_mean_and_signed_pca_frozen",
+  "ll_pairs": [
+    ["qwen2-7b", "olmo-7b-0724"],
+    ["qwen2.5-7b", "olmo2-1124-7b"],
+    ["qwen3-8b-base", "olmo-3-1025-7b"]
+  ],
+  "control_pairs": [
+    ["qwen2-7b", "dinov2-small"],
+    ["olmo-7b-0724", "dinov2-small"],
+    ["qwen2-7b", "olmo-7b-0724"]
+  ],
+  "control_choice": "The three pairs already fixed in metric_stability.json. Not re-chosen from alignment scores.",
+  "shuffle": {
+    "mode": "a_only",
+    "rho": 0.4,
+    "families": [
+      {"family": "oblique_diag", "profile": "basis"},
+      {"family": "block4", "profile": "strong"}
+    ]
+  },
+  "output": "results/structured_metric_factors",
+  "do_not_modify": [
+    "results/prh_released_code",
+    "results/learned_kernels",
+    "results/flex_kernels",
+    "results/anisotropic_kernels",
+    "results/release_anisotropy",
+    "results/release_anisotropy_repair",
+    "results/metric_stability",
+    "results/resampled_metric_training"
+  ]
+}

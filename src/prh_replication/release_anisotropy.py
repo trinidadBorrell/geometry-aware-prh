@@ -100,6 +100,19 @@ def subspace_metric(u: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.eye(u.shape[0]) + u @ (b - np.eye(q)) @ u.T
 
 
+def ambient_metric_diag(u: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """diag(I + U(B−I)Uᵀ) without forming the ambient d×d matrix.
+
+    Original hidden-coordinate order is preserved (rows of U).
+    """
+    u, b = to_numpy64(u), to_numpy64(b)
+    q = b.shape[0]
+    if u.ndim != 2 or b.shape != (q, q) or u.shape[1] != q:
+        raise ValueError("U is d×q and B is q×q")
+    c = 0.5 * (b + b.T) - np.eye(q)
+    return 1.0 + np.sum(u * (u @ c), axis=1)
+
+
 def signed_correction(u: np.ndarray, b: np.ndarray) -> np.ndarray:
     return to_numpy64(u) @ (to_numpy64(b) - np.eye(b.shape[0])) @ to_numpy64(u).T
 

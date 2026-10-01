@@ -60,6 +60,18 @@ def test_official_eps_differs_from_extension_on_tiny_grams():
     assert st["degenerate"]
 
 
+def test_split_fit_holdout_is_disjoint_80_20():
+    from prh_replication.kernel_experiment import split_fit_holdout
+
+    n = 4096
+    fit, hold = split_fit_holdout(n, 0.2, seed=0)
+    assert hold.numel() == 819
+    assert fit.numel() == n - 819
+    assert set(fit.tolist()).isdisjoint(set(hold.tolist()))
+    fit2, hold2 = split_fit_holdout(n, 0.2, seed=0)
+    assert torch.equal(fit, fit2) and torch.equal(hold, hold2)
+
+
 def test_narrow_rbf_cka_and_ratio_near_one():
     torch.manual_seed(2)
     x = F.normalize(torch.randn(16, 5), dim=-1)

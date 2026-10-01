@@ -1,0 +1,46 @@
+{
+  "name": "resampled_metric_training_v1",
+  "label": "Full-gallery versus quarter-gallery resampling for one-sided anisotropic CKA",
+  "evaluation_status": "exploratory_heldout",
+  "objective": "subset or full-gallery excess a-b; partner metric fixed at identity",
+  "q": 32,
+  "partner": "dinov2-small",
+  "language_models": [
+    "qwen2-7b",
+    "qwen2.5-7b",
+    "qwen3-8b-base",
+    "olmo-7b-0724",
+    "olmo2-1124-7b",
+    "olmo-3-1025-7b"
+  ],
+  "budgets_rho": [0.1, 0.4],
+  "init_seeds": [0, 1, 2],
+  "init_seed_0": "exact identity",
+  "pert_scale": 0.05,
+  "sampling_seeds": [0, 1, 2],
+  "quarter_fraction": 0.25,
+  "n_updates": 120,
+  "extended_updates": 480,
+  "extended_schedule": "same constant Adam learning rate 0.03 and gradient clip 5 through update 480; no decay",
+  "validation_check": "every update including iteration zero",
+  "budget_continuation": "none; each budget starts from the same seed-determined matrix, then projected onto that budget",
+  "optim": {
+    "name": "Adam",
+    "lr": 0.03,
+    "grad_clip": 5.0,
+    "b_path": "torch.matrix_exp",
+    "projection": "eigh_outside_graph_then_scale"
+  },
+  "knn_k": 10,
+  "basis": "full_training_mean_and_signed_pca_frozen",
+  "output": "results/resampled_metric_training",
+  "do_not_modify": [
+    "results/prh_released_code",
+    "results/learned_kernels",
+    "results/flex_kernels",
+    "results/anisotropic_kernels",
+    "results/release_anisotropy",
+    "results/release_anisotropy_repair",
+    "results/metric_stability"
+  ]
+}

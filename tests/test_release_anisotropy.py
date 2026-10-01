@@ -80,6 +80,19 @@ def test_psd_split_and_signatures():
     assert gplus.shape == (12, 12)
 
 
+def test_ambient_metric_diag_matches_full_without_forming_need():
+    from prh_replication.release_anisotropy import ambient_metric_diag, subspace_metric
+
+    rng = np.random.default_rng(2)
+    u, _ = np.linalg.qr(rng.normal(size=(11, 4)))
+    a = rng.normal(size=(4, 4))
+    b = a @ a.T + np.eye(4)
+    full = np.diag(subspace_metric(u, b))
+    cheap = ambient_metric_diag(u, b)
+    assert cheap.shape == (11,)
+    assert np.allclose(cheap, full, atol=1e-12)
+
+
 def test_nonzero_budget_respects_bounds():
     g = torch.Generator().manual_seed(2)
     xa = F.normalize(torch.randn(30, 10, generator=g), dim=-1).numpy().astype(np.float64)

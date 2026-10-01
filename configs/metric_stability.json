@@ -1,0 +1,59 @@
+{
+  "name": "metric_stability_v1",
+  "label": "Fitting mode, sample-size stability, and partner transfer for full symmetric S",
+  "evaluation_status": "exploratory_heldout",
+  "objective": "excess",
+  "q": 32,
+  "eig_bounds": [0.25, 4.0],
+  "primary_budgets_rho": [0.0, 0.1, 0.4],
+  "sample_budgets_rho": [0.1, 0.4],
+  "per_side_rho": 0.4,
+  "accounting_primary": "equal_total",
+  "modes_primary": ["identity", "a_only", "b_only", "separate", "shared_pc"],
+  "modes_sample": ["a_only", "separate"],
+  "sample_sizes": [128, 256, 512, 1024, 2048],
+  "n_sequences": 3,
+  "subset_seed": 20260927,
+  "init_seed": 11,
+  "pert_scale": 0.05,
+  "null_perm_seeds": [0, 1, 2],
+  "basis_rotation_seed": 20260928,
+  "n_rotations": 3,
+  "rotation_rho": 0.4,
+  "transfer_sizes": [128, 512, 2048],
+  "shuffle_sizes": [128, 2048],
+  "shuffle_rho": 0.4,
+  "shuffle_modes": ["a_only", "separate"],
+  "sample_vision": "dinov2-small",
+  "ll_pairs": [
+    ["qwen2-7b", "olmo-7b-0724"],
+    ["qwen2.5-7b", "olmo2-1124-7b"],
+    ["qwen3-8b-base", "olmo-3-1025-7b"]
+  ],
+  "control_pairs": [
+    ["qwen2-7b", "dinov2-small"],
+    ["olmo-7b-0724", "dinov2-small"],
+    ["qwen2-7b", "olmo-7b-0724"]
+  ],
+  "control_choice": "Earliest base Qwen, earliest base OLMo, and that cross-family pair. Not chosen from alignment scores.",
+  "sign_convention": "largest_abs_entry_nonnegative",
+  "optim": {
+    "name": "Adam",
+    "n_steps": 120,
+    "lr": 0.03,
+    "grad_clip": 5.0,
+    "monotone_atol": 1e-8,
+    "b_path": "torch.matrix_exp",
+    "projection": "eigh_outside_graph_then_scale"
+  },
+  "knn_k": 10,
+  "do_not_modify": [
+    "results/prh_released_code",
+    "results/learned_kernels",
+    "results/flex_kernels",
+    "results/anisotropic_kernels",
+    "results/release_anisotropy",
+    "results/release_anisotropy_repair"
+  ],
+  "output": "results/metric_stability"
+}

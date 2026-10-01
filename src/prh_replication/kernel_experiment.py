@@ -245,6 +245,19 @@ def profile_of(family: str, lam: float, alpha: float | None) -> torch.Tensor:
     return rq_profile(r, lam, float(alpha))
 
 
+def split_fit_holdout(n: int, hold_frac: float = 0.2, seed: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
+    """Disjoint fit / holdout index split. Holdout size is round(n * hold_frac)."""
+    if n < 5:
+        raise ValueError(f"need n>=5, got {n}")
+    if not 0 < hold_frac < 0.5:
+        raise ValueError(hold_frac)
+    g = torch.Generator().manual_seed(seed)
+    perm = torch.randperm(n, generator=g)
+    n_hold = int(round(n * hold_frac))
+    n_hold = min(max(n_hold, 1), n - 1)
+    return perm[n_hold:], perm[:n_hold]
+
+
 def subset_indices(n: int, subset_size: int, n_subsets: int, seed: int) -> list[torch.Tensor]:
     g = torch.Generator().manual_seed(seed)
     perm = torch.randperm(n, generator=g)
