@@ -14,7 +14,7 @@ from pprint import pprint
 from utils import *
 
     
-def compute_distances(feat_path, model_name, normalize=True):
+def compute_distances(feat_path, model, normalize=True):
     
     os.makedirs(args.output_dir, exist_ok=True)
 
@@ -24,7 +24,6 @@ def compute_distances(feat_path, model_name, normalize=True):
     else:
         x_feats = [prepare_features(layer.float(), exact=False) for layer in raw_x]
 
-    pbar = tqdm(total=len(x_feats))
     pairwise_dists = []
     for l, x in enumerate(x_feats):
         if normalize:
@@ -36,7 +35,7 @@ def compute_distances(feat_path, model_name, normalize=True):
         pairwise_dists.append(K)
     pairwise_dists = np.array(pairwise_dists)
     
-    np.save(os.path.join(args.output_dir, f'{model_name}_dists.npy'), {
+    np.save(os.path.join(args.output_dir, f'{model}_dists.npy'), {
             "pairwise_dists": pairwise_dists,
     })
 
@@ -50,12 +49,20 @@ if __name__ == "__main__":
     parser.add_argument("--dataset",        type=str, default="prh/minhuh")
     parser.add_argument("--subset",         type=str, default="wit_1024")
     parser.add_argument("--input_file",      type=str, default=None)
-    parser.add_argument("--model_name",      type=str, default=None)
+    parser.add_argument("--input_dir",      type=str, default=None)
+    parser.add_argument("--modality",      type=str, default="language")
+    parser.add_argument("--model_name",      type=str)
+
     
-    parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/alignment")
+    parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/manifold_dists")
     
 
     args = parser.parse_args()
-    assert args.model_name in args.input_file
 
-    compute_distances(args.input_file, args.model_name)
+    assert (args.input_file is None) + (args.input_dir is None) == 1, "only 1 of input_dir or input_file can be specified"
+    if args.input_file is not None:
+        feat_path = args.input_file
+    else:
+        feat_path = to_feature_filename(args.input_dir, args.modality, args.model_nae)
+
+    compute_distances(feat_path, args.model_name)
