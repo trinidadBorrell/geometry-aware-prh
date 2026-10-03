@@ -63,6 +63,6 @@ if __name__ == "__main__":
     if args.input_file is not None:
         feat_path = args.input_file
     else:
-        feat_path = to_feature_filename(args.input_dir, args.modality, args.model_nae)
+        feat_path = to_feature_filename(args.input_dir, args.modality, args.model_name)
 
     compute_distances(feat_path, args.model_name)
