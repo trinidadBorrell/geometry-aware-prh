@@ -45,3 +45,36 @@ def test_recovers_dimension_of_embedded_gaussian(m):
     x = rng.standard_normal((4000, m)) @ basis.T + 5.0
     # the MLE is biased low in higher dimension at finite n; 15% covers m <= 10 at n = 4000
     assert idim.levina_bickel(x)["id"] == pytest.approx(m, rel=0.15)
+
+
+def _dadapy_two_nn(x: np.ndarray, mu_fraction: float = 0.9) -> float:
+    """DADApy `compute_id_2NN` (algorithm="base") written out: sorted log mu, keep the lowest
+    int(N * mu_fraction), regress -log(1 - i/N) on them through the origin."""
+    d = cdist(x, x)
+    np.fill_diagonal(d, np.inf)
+    d = np.sort(d, axis=1)
+    n = len(x)
+    n_eff = int(n * mu_fraction)
+    log_mu = np.sort(np.log(d[:, 1] / d[:, 0]))[:n_eff]
+    y = -np.log(1 - np.arange(1, n_eff + 1) / n)
+    return float((log_mu @ y) / (log_mu @ log_mu))
+
+
+def test_two_nn_matches_dadapy_formula():
+    x = np.random.default_rng(3).standard_normal((300, 7))
+    assert idim.two_nn(x)["id"] == pytest.approx(_dadapy_two_nn(x), rel=1e-10)
+
+
+def test_two_nn_drops_duplicates():
+    x = np.random.default_rng(4).standard_normal((300, 5))
+    res = idim.two_nn(np.concatenate([x, x[:20]]))
+    assert res["n_unique"] == 300
+    assert res["id"] == pytest.approx(idim.two_nn(x)["id"])
+
+
+@pytest.mark.parametrize("m", [2, 5, 10])
+def test_two_nn_recovers_dimension_of_embedded_gaussian(m):
+    rng = np.random.default_rng(10 + m)
+    basis = np.linalg.qr(rng.standard_normal((200, m)))[0]
+    x = rng.standard_normal((4000, m)) @ basis.T + 5.0
+    assert idim.two_nn(x)["id"] == pytest.approx(m, rel=0.15)

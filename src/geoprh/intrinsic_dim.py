@@ -1,4 +1,6 @@
-"""Levina-Bickel maximum-likelihood intrinsic dimension (exp-010), via scikit-dimension.
+"""Intrinsic dimension estimators for exp-010, via scikit-dimension: Levina-Bickel and TwoNN.
+
+Levina-Bickel maximum-likelihood intrinsic dimension:
 
 Levina & Bickel 2004, "Maximum likelihood estimation of intrinsic dimension", Eqs. 8-9:
 
@@ -31,3 +33,21 @@ def levina_bickel(x, k1: int = 10, k2: int = 20, n_jobs: int = 1) -> dict:
         est = skdim.id.MLE().fit(x, precomputed_knn_arrays=(dists[:, :k], idx[:, :k]), comb="mean")
         id_k[k] = float(est.dimension_)
     return {"id": sum(id_k.values()) / len(id_k), "id_k": id_k, "n_unique": len(x)}
+
+
+def two_nn(x, discard_fraction: float = 0.1, n_jobs: int = 1) -> dict:
+    """TwoNN (Facco et al. 2017) as in DADApy's `compute_id_2NN` (algorithm="base"), via skdim.
+
+    mu_i = r_i2 / r_i1; the largest `discard_fraction` of the mu are dropped; the ID is the slope
+    of the least-squares line through the origin of -log(1 - i/N) against log mu_(i) (sorted,
+    N = all points). This is what Valeriani et al. 2023 use (DADApy, mu_fraction = 0.9).
+
+    x: [n, d] array; duplicate rows dropped first. Returns {"id": d, "n_unique": int}.
+    """
+    x = np.unique(np.asarray(x, dtype=np.float64), axis=0)
+    dists, _ = get_nn(x, k=2, n_jobs=n_jobs)
+    est = skdim.id.TwoNN(discard_fraction=discard_fraction, dist=True).fit(dists)
+    return {"id": float(est.dimension_), "n_unique": len(x)}
+
+
+ESTIMATORS = {"lb": levina_bickel, "twonn": two_nn}

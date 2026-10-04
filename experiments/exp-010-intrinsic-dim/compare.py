@@ -10,6 +10,7 @@ block 0 (the cache has no patch-embedding layer).
                          (darker = larger)
 * fig3_family_means      mean profile per family on a common depth grid (band = min..max over the
                          family's sizes); columns LLM | ViT, rows raw | prh
+* fig4_estimators_<prep> with --other: family mean profiles of the two estimators
 * summary_models.txt     per model: ID at depth 0, 0.5 and 1, peak depth, min..max; and, with
                          --check, Spearman of the model ordering at n=1000 vs n=10000
 """
@@ -44,6 +45,15 @@ VIT_SIZES = ["tiny", "small", "base", "large", "huge", "giant"]
 GRID_DEPTH = np.linspace(0, 1, 21)
 DEPTHS = (0.0, 0.25, 0.5, 0.75, 1.0)
 PREP_TITLE = {"raw": "raw activations", "prh": "PRH features"}
+
+ESTIMATOR_LABEL = {"lb": "Levina-Bickel, k=10..20", "twonn": "TwoNN"}
+YLABEL = [ESTIMATOR_LABEL["lb"]]  # set from the data in main()
+
+
+def estimator_of(path: Path) -> str:
+    with path.open() as f:
+        return json.loads(f.readline()).get("estimator", "lb")
+
 
 plt.rcParams.update(
     {
@@ -131,7 +141,7 @@ def fig_profiles(data: dict, prep: str, out: Path) -> None:
     for ax in axes[-1]:
         ax.set_xlabel("relative depth (layer / (L-1))")
     for ax in axes[:, 0]:
-        ax.set_ylabel("intrinsic dimension (Levina-Bickel)")
+        ax.set_ylabel(f"intrinsic dimension ({YLABEL[0]})")
     fig.suptitle(f"ID profiles, n = 1024 (PRH wit_1024) - {PREP_TITLE[prep]}", color=INK)
     fig.tight_layout()
     for ext in ("png", "pdf"):
@@ -164,6 +174,38 @@ def fig_family_means(data: dict, out: Path) -> None:
     for ext in ("png", "pdf"):
         fig.savefig(out / f"fig3_family_means.{ext}", dpi=160)
     plt.close(fig)
+
+
+def fig_estimators(data: dict, other: dict, other_label: str, out: Path) -> None:
+    """Family mean profile of this estimator vs another, one panel per family, both geometries."""
+    for prep in ("raw", "prh"):
+        fams = by_family(data, prep)
+        if not fams:
+            continue
+        fig, axes = plt.subplots(2, 4, figsize=(15, 6.4), sharex=True, sharey=True)
+        for ax, (fam, models) in zip(axes.flat, fams.items(), strict=False):
+            for c, src, label in ((SERIES[0], data, YLABEL[0]), (SERIES[1], other, other_label)):
+                ys = np.array([np.interp(GRID_DEPTH, *profile(src[(m, prep)])) for m in models])
+                ax.fill_between(GRID_DEPTH, ys.min(0), ys.max(0), color=c, alpha=0.18, lw=0)
+                ax.plot(GRID_DEPTH, ys.mean(0), color=c, label=label)
+            ax.set_title(f"{fam} ({len(models)} models)", color=INK)
+            ax.set_ylim(bottom=0)
+            ax.legend(frameon=False, fontsize=7, loc="best")
+        for ax in axes.flat[len(fams) :]:
+            ax.set_visible(False)
+        for ax in axes[-1]:
+            ax.set_xlabel("relative depth")
+        for ax in axes[:, 0]:
+            ax.set_ylabel("intrinsic dimension")
+        fig.suptitle(
+            f"Estimators compared, n = 1024 - {PREP_TITLE[prep]} (line = family mean, "
+            "band = min..max over sizes)",
+            color=INK,
+        )
+        fig.tight_layout()
+        for ext in ("png", "pdf"):
+            fig.savefig(out / f"fig4_estimators_{prep}.{ext}", dpi=160)
+        plt.close(fig)
 
 
 def at_depth(entry: dict, depth: float) -> float:
@@ -213,7 +255,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, required=True, help="stage-2 output dir")
     parser.add_argument("--check", type=Path, default=None, help="wit1m10k output dir (n check)")
+    parser.add_argument(
+        "--other", type=Path, default=None, help="stage-2 dir of another estimator (fig4)"
+    )
     args = parser.parse_args()
+    YLABEL[0] = ESTIMATOR_LABEL[estimator_of(args.root / "intrinsic_dim.jsonl")]
     data = load(args.root / "intrinsic_dim.jsonl")
     out = args.root / "figures"
     out.mkdir(exist_ok=True)
@@ -221,6 +267,9 @@ def main() -> None:
         if any(k[1] == prep for k in data):
             fig_profiles(data, prep, out)
     fig_family_means(data, out)
+    if args.other:
+        other = args.other / "intrinsic_dim.jsonl"
+        fig_estimators(data, load(other), ESTIMATOR_LABEL[estimator_of(other)], out)
     text = summary(data, args.check)
     (args.root / "summary_models.txt").write_text(text)
     print(text)

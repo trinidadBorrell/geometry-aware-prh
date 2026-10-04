@@ -23,6 +23,15 @@ INK, INK_MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3dd", "#fcfcfb"
 ORDINAL = ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]  # blue 250/400/550/700, small -> large n
 PREP_TITLE = {"raw": "raw activations", "prh": "PRH features (q=0.95 clamp, l2 norm)"}
 
+ESTIMATOR_LABEL = {"lb": "Levina-Bickel, k=10..20", "twonn": "TwoNN"}
+YLABEL = [ESTIMATOR_LABEL["lb"]]  # set from the data in main()
+
+
+def estimator_of(path: Path) -> str:
+    with path.open() as f:
+        return json.loads(f.readline()).get("estimator", "lb")
+
+
 plt.rcParams.update(
     {
         "font.size": 9,
@@ -86,7 +95,7 @@ def fig_by_layer(data: dict, out: Path) -> None:
                 )
             ax.set_title(f"{model} - {PREP_TITLE[prep]}", color=INK)
             ax.set_xlabel("layer (0 = embeddings)" if "/" in model else "block")
-            ax.set_ylabel("intrinsic dimension (Levina-Bickel, k=10..20)")
+            ax.set_ylabel(f"intrinsic dimension ({YLABEL[0]})")
             ax.set_ylim(bottom=0)
             ax.legend(frameon=False, fontsize=8, loc="best")
     fig.tight_layout()
@@ -122,6 +131,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, required=True)
     args = parser.parse_args()
+    YLABEL[0] = ESTIMATOR_LABEL[estimator_of(args.root / "intrinsic_dim.jsonl")]
     data = load(args.root)
     out = args.root / "figures"
     out.mkdir(exist_ok=True)

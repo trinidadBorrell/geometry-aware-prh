@@ -15,8 +15,10 @@ Geometries (--preps):
 - prh: the PRH preprocessing the alignment metrics see (platonic-rep / exp-006): q = 0.95
   outlier clamp over the sample's layers (Aristotelian `prepare_features`), then l2 norm
 
-Estimator: `geoprh.intrinsic_dim` (scikit-dimension `MLE`), Levina & Bickel 2004 Eqs. 8-9,
-averaged over k = 10..20; exact duplicate rows dropped first (`n_unique` in the output).
+Estimators (--estimator), `geoprh.intrinsic_dim` via scikit-dimension; exact duplicate rows
+dropped first (`n_unique` in the output):
+- lb:    Levina & Bickel 2004 Eqs. 8-9 (`MLE`), averaged over k = 10..20
+- twonn: TwoNN (Facco et al. 2017) as DADApy's `compute_id_2NN`, used by Valeriani et al. 2023
 
     uv run python experiments/exp-010-intrinsic-dim/run.py --out <dir> \\
         --models bigscience/bloomz-560m
@@ -97,6 +99,7 @@ def main() -> None:
     parser.add_argument("--models", default="bigscience/bloomz-560m", help="comma list or all")
     parser.add_argument("--sizes", default="1000,2000,5000,10000")
     parser.add_argument("--preps", default="raw,prh")
+    parser.add_argument("--estimator", choices=list(idim.ESTIMATORS), default="lb")
     parser.add_argument("--k1", type=int, default=10)
     parser.add_argument("--k2", type=int, default=20)
     parser.add_argument("--threads", type=int, default=None)
@@ -141,12 +144,15 @@ def main() -> None:
                         t0 = time.time()
                         x = layers(feats[n * s : n * (s + 1)], prep)
                         for layer in range(x.shape[1]):
-                            est = idim.levina_bickel(
-                                x[:, layer].numpy(), args.k1, args.k2, n_jobs=n_jobs
-                            )
+                            xl = x[:, layer].numpy()
+                            if args.estimator == "lb":
+                                est = idim.levina_bickel(xl, args.k1, args.k2, n_jobs=n_jobs)
+                            else:
+                                est = idim.two_nn(xl, n_jobs=n_jobs)
                             rec = {
                                 "model": model,
                                 "data": args.data,
+                                "estimator": args.estimator,
                                 "modality": var.modality,
                                 "num_layers": x.shape[1],
                                 "layer": layer,
