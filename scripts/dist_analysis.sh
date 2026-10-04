@@ -48,7 +48,7 @@ RESULTS=/workspace/results/emily
 LLM=openlm-research_open_llama_3b
 LVM=vit_base_patch14_dinov2.lvd142m
 
-python characterize_manifold.py --input_file "$FEATS/wit_1024/${LLM}_pool-avg.pt" --model_name "$LLM" --modality "language"
-python characterize_manifold.py --input_file "$FEATS/wit_1m/shards/$LLM/shard_0000.pt" --model_name "$LLM" --modality "language"
-python characterize_manifold.py --input_file "$FEATS/wit_1024/${LVM}_pool-cls.pt" --model_name "$LVM" --modality "vision"
-python characterize_manifold.py --input_file "$FEATS/wit_1m/shards/$LVM/shard_0000.pt" --model_name "$LVM" --modality "vision"
+python characterize_manifold.py --input_file "$FEATS/wit_1024/${LLM}_pool-avg.pt" --model_name "{$LLM}_1024" --modality "language"
+python characterize_manifold.py --input_file "$FEATS/wit_1m/shards/$LLM/shard_0000.pt" --model_name "{$LLM}_10k"  --modality "language"
+python characterize_manifold.py --input_file "$FEATS/wit_1024/${LVM}_pool-cls.pt" --model_name "{$LVM}_1024"  --modality "vision"
+python characterize_manifold.py --input_file "$FEATS/wit_1m/shards/$LVM/shard_0000.pt" --model_name "{$LVM}_10k"  --modality "vision"
