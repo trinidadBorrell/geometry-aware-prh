@@ -1,6 +1,6 @@
 # exp-010: intrinsic dimension of the representations, per layer and vs sample size
 
-**Status:** stage 1 and 2 done · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-010-intrinsic-dim/`
+**Status:** stages 1-2 and TwoNN check done · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-010-intrinsic-dim/`
 
 ## Idea
 
@@ -130,7 +130,44 @@ n = 1024 is therefore sound for the PRH geometry, as the absolute values are bia
 Caveats: one sample set at n = 1024 (stage 1 puts set-to-set sd at ~0.5-2); mean-pooled text vs
 CLS-token images, so pooling differs between modalities; Levina-Bickel only.
 
-## Next
+## Results (TwoNN check)
+
+Question: Valeriani et al. 2023 report an early/intermediate ID peak using TwoNN; is our
+monotone LLM profile an artefact of Levina-Bickel? Run 2026-10-04, commit `a5839f6`, RTX PRO 4000,
+~25 min, same data and sets as stages 1-2 (all 8 wit1m10k models at every n). Outputs in
+`.../exp-010-intrinsic-dim/twonn/` (`fig1_id_by_layer`, `prh1024/fig4_estimators_{raw,prh}`).
+
+**Estimator.** TwoNN as DADApy's `compute_id_2NN` (the implementation Valeriani et al. use):
+mu = r2/r1, largest 10% dropped, least-squares slope through the origin of -log(1 - i/N) on
+log mu. Computed with `skdim.id.TwoNN` (DADApy does not build on Windows); a test checks it
+against DADApy's formula written out. DADApy's decimation (`data_fraction`, mean over 1/f random
+subsets) is what our disjoint sets at each n already do.
+
+**1. LLMs: same shape, no peak.** TwoNN gives the same decline from the embeddings
+(PRH, n = 1024: 40-58 at layer 0, 22-32 at mid depth, 23-33 at the end), ~5-10 lower than
+Levina-Bickel. The maximum is at relative depth <= 0.04 for all 10 LLMs. The estimator does not
+explain the missing peak.
+
+**2. ViTs: the estimator matters in late layers.** Levina-Bickel's late-layer rise (to 30-44
+for IN21k, CLIP-ft, DINOv2) is mostly absent with TwoNN, which plateaus at ~15-25. The ViT maximum
+moves into the middle for several models (CLIP-huge 0.39, DINOv2-base 0.36, IN21k-small 0.36,
+DINOv2-giant 0.69); at n = 10000, IN21k-small peaks at block 4/11 and DINOv2-small at 6/11 with
+a dip after. That is closer to Valeriani's iGPT shape. Levina-Bickel at k = 10..20 looks at larger
+neighbourhoods than TwoNN (k = 2), so the late-layer ViT ID is scale dependent.
+
+**3. n dependence.** TwoNN moves the other way from Levina-Bickel for LLMs: in the PRH geometry,
+early-layer ID falls with n (bloomz-560m layer 0: 49 at 1k -> 43 at 10k) where Levina-Bickel
+rose. The model ordering at 1k vs 10k is mostly stable (Spearman 0.90-1.00) except PRH at mid
+depth (0.69).
+
+**What likely explains the difference from the literature (not tested).** Valeriani et al. take
+the input of each block after its first LayerNorm, on protein LMs and iGPT. Cheng et al. 2025,
+who find the mid-depth peak in text LLMs, use the residual stream as we do but the **last token**
+of 20-token sequences, GRIDE at a plateau scale (k ~ 32), 10k sequences. We mean-pool short
+captions: layer 0 is then a bag-of-words average, which plausibly carries the highest ID, whereas
+a single last token at layer 0 is one vocabulary embedding with low ID. Pooling is the most likely
+cause; testing it needs a new extraction with last-token pooling.
+
 
 - Test the manifold / non-linearity question directly: compare linear dimension (PCA participation
   ratio, number of PCs for 90% variance) with the nonlinear ID per layer; scale-dependent ID
