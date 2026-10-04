@@ -28,6 +28,7 @@ dependencies = [
     # Aristotelian/ on sys.path, which makes `aristotelian` and `scripts` importable.
     "calibrated-similarity",
     "hf-xet>=1.6.0",
+    "scikit-dimension>=0.3.7",
 ]
 
 [project.optional-dependencies]

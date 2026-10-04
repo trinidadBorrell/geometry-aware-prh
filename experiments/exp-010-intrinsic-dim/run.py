@@ -1,0 +1,156 @@
+"""exp-010: Levina-Bickel intrinsic dimension per layer, vs number of samples.
+
+Data: exp-006's cached activations of the first 10240 WIT-1M samples
+(`askoepke_wit_1m_recaptioned_first10240-original_pool-{avg,cls}`; LLM: every hidden state,
+mean-pooled over the caption; ViT: every block's CLS token).
+
+Sample sets: for each n in --sizes, the disjoint row blocks [n s, n (s+1)) that fit in 10240,
+i.e. 10 x 1000, 5 x 2000, 2 x 5000, 1 x 10000. Every set gives one estimate per layer, so the
+spread at each n is the variability across sample sets.
+
+Geometries (--preps):
+- raw: the activations as cached
+- prh: the PRH preprocessing the alignment metrics see (platonic-rep / exp-006): q = 0.95
+  outlier clamp over the sample's layers (Aristotelian `prepare_features`), then l2 norm
+
+Estimator: `geoprh.intrinsic_dim` (scikit-dimension `MLE`), Levina & Bickel 2004 Eqs. 8-9,
+averaged over k = 10..20; exact duplicate rows dropped first (`n_unique` in the output).
+
+    uv run python experiments/exp-010-intrinsic-dim/run.py --out <dir> \\
+        --models bigscience/bloomz-560m
+    uv run python experiments/exp-010-intrinsic-dim/run.py --out <dir> --inventory
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import time
+from pathlib import Path
+
+import torch
+import torch.nn.functional as F
+
+from aristotelian.prh.preprocess import prepare_features
+from geoprh import activation_cache as ac
+from geoprh import intrinsic_dim as idim
+
+N_TOTAL = 10240
+DATASET, SUBSET = "askoepke/wit_1m_recaptioned", f"first{N_TOTAL}-original"
+
+
+def variant(model: str) -> ac.Variant:
+    # HF language models are "org/name", timm vision models have no "/"
+    language = "/" in model
+    return ac.Variant(
+        dataset=DATASET,
+        subset=SUBSET,
+        pool="avg" if language else "cls",
+        caption_idx=None,
+        modality="language" if language else "vision",
+    )
+
+
+def layers(feats: torch.Tensor, prep: str) -> torch.Tensor:
+    """[n, L, d] features in the requested geometry."""
+    if prep == "raw":
+        return feats.float()
+    if prep == "prh":
+        return F.normalize(prepare_features(feats, q=0.95, exact=False), dim=-1)
+    raise ValueError(prep)
+
+
+def inventory(root: Path) -> list[dict]:
+    """Every cached (model, dataset key): samples, layers, dim."""
+    rows = []
+    for meta in sorted(root.glob("*/layer_00/*.meta.json")):
+        m = json.loads(meta.read_text())
+        n_layers = sum(1 for d in meta.parent.parent.glob("layer_*") if (d / meta.name).exists())
+        rows.append(
+            {
+                "model": m["model"],
+                "modality": m["modality"],
+                "key": meta.name.removesuffix(".meta.json"),
+                "n": m["shape"][0],
+                "dim": m["shape"][1],
+                "num_layers": m["num_layers"],
+                "layers_cached": n_layers,
+                "num_params": m.get("num_params"),
+            }
+        )
+    return rows
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--root", type=Path, default=None, help="activation cache root")
+    parser.add_argument("--models", default="bigscience/bloomz-560m")
+    parser.add_argument("--sizes", default="1000,2000,5000,10000")
+    parser.add_argument("--preps", default="raw,prh")
+    parser.add_argument("--k1", type=int, default=10)
+    parser.add_argument("--k2", type=int, default=20)
+    parser.add_argument("--threads", type=int, default=None)
+    parser.add_argument("--inventory", action="store_true", help="only list the cache")
+    args = parser.parse_args()
+    root = args.root or ac.default_root()
+    args.out.mkdir(parents=True, exist_ok=True)
+    if args.threads:
+        torch.set_num_threads(args.threads)
+    n_jobs = args.threads or 1  # sklearn kNN search
+
+    if args.inventory:
+        rows = inventory(root)
+        (args.out / "inventory.json").write_text(json.dumps(rows, indent=1))
+        for r in rows:
+            print(f"{r['model']:<50} {r['key']:<60} n={r['n']:<6} L={r['layers_cached']}")
+        return
+
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout
+    meta = {**{k: str(v) for k, v in vars(args).items()}, "git_sha": sha.strip()}
+    meta["threads"] = torch.get_num_threads()
+    (args.out / "meta.json").write_text(json.dumps(meta, indent=2))
+
+    sizes = [int(s) for s in args.sizes.split(",")]
+    with (args.out / "intrinsic_dim.jsonl").open("a") as fout:
+        for model in args.models.split(","):
+            var = variant(model)
+            payload = ac.load_model(root, model, var)
+            if payload is None:
+                print(f"[skip] {model}: not fully cached ({var.key})")
+                continue
+            feats = payload["feats"]
+            print(f"{model}: feats {tuple(feats.shape)}", flush=True)
+            for n in sizes:
+                for s in range(N_TOTAL // n):
+                    for prep in args.preps.split(","):
+                        t0 = time.time()
+                        x = layers(feats[n * s : n * (s + 1)], prep)
+                        for layer in range(x.shape[1]):
+                            est = idim.levina_bickel(
+                                x[:, layer].numpy(), args.k1, args.k2, n_jobs=n_jobs
+                            )
+                            rec = {
+                                "model": model,
+                                "modality": var.modality,
+                                "num_layers": x.shape[1],
+                                "layer": layer,
+                                "dim": x.shape[2],
+                                "n": n,
+                                "set": s,
+                                "prep": prep,
+                                **est,
+                            }
+                            fout.write(json.dumps(rec) + "\n")
+                        fout.flush()
+                        print(
+                            f"  n={n} set={s} {prep}: {time.time() - t0:.1f}s "
+                            f"(last layer id {est['id']:.1f})",
+                            flush=True,
+                        )
+            del feats, payload
+
+
+if __name__ == "__main__":
+    main()
