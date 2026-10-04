@@ -35,11 +35,11 @@ LVM_MODELS=(
     "vit_huge_patch14_clip_224.laion2b_ft_in12k"
 )
 
-for model in "${LLM_MODELS}"; do
+for model in "${LLM_MODELS[@]}"; do
     python characterize_manifold.py --input_dir "/workspace/hf" --model_name "$model" --modality "language"
 done
 
-for model in "${LVM_MODELS}"; do
+for model in "${LVM_MODELS[@]}"; do
     python characterize_manifold.py --input_dir "/workspace/hf" --model_name "$model" --modality "vision"
 done
 
