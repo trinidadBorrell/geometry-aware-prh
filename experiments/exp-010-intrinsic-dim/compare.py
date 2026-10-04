@@ -10,7 +10,9 @@ block 0 (the cache has no patch-embedding layer).
                          (darker = larger)
 * fig3_family_means      mean profile per family on a common depth grid (band = min..max over the
                          family's sizes); columns LLM | ViT, rows raw | prh
-* fig4_estimators_<prep> with --other: family mean profiles of the two estimators
+* fig4_estimators_<prep> with --other: family mean profiles of every estimator (a PCA dir adds two
+                         series: PCs for 90% variance and participation ratio; log y then)
+* summary_models.txt     with --other: linear (PCA) vs nonlinear ID per family at depth 0, 0.5, 1
 * summary_models.txt     per model: ID at depth 0, 0.5 and 1, peak depth, min..max; and, with
                          --check, Spearman of the model ordering at n=1000 vs n=10000
 """
@@ -46,7 +48,12 @@ GRID_DEPTH = np.linspace(0, 1, 21)
 DEPTHS = (0.0, 0.25, 0.5, 0.75, 1.0)
 PREP_TITLE = {"raw": "raw activations", "prh": "PRH features"}
 
-ESTIMATOR_LABEL = {"lb": "Levina-Bickel, k=10..20", "twonn": "TwoNN"}
+ESTIMATOR_LABEL = {
+    "lb": "Levina-Bickel, k=10..20",
+    "twonn": "TwoNN",
+    "pca": "PCA: PCs for 90% variance",
+}
+PR_LABEL = "PCA: participation ratio"
 YLABEL = [ESTIMATOR_LABEL["lb"]]  # set from the data in main()
 
 
@@ -86,15 +93,15 @@ def size_label(model: str) -> str:
     return next(s for s in VIT_SIZES if f"_{s}_" in model)
 
 
-def load(path: Path, n: int | None = None) -> dict:
-    """{(model, prep): {"id": [sets, L] array, "dim": d, "modality": str}} at sample size n."""
+def load(path: Path, n: int | None = None, field: str = "id") -> dict:
+    """{(model, prep): {"id": [sets, L] array of `field`, "dim": d, "modality": str}} at size n."""
     acc = defaultdict(dict)
     info = {}
     for line in path.open():
         r = json.loads(line)
         if n is not None and r["n"] != n:
             continue
-        acc[(r["model"], r["prep"])][(r["set"], r["layer"])] = r["id"]
+        acc[(r["model"], r["prep"])][(r["set"], r["layer"])] = r[field]
         info[(r["model"], r["prep"])] = (r["dim"], r["num_layers"], r["modality"])
     out = {}
     for key, d in acc.items():
@@ -176,27 +183,42 @@ def fig_family_means(data: dict, out: Path) -> None:
     plt.close(fig)
 
 
-def fig_estimators(data: dict, other: dict, other_label: str, out: Path) -> None:
-    """Family mean profile of this estimator vs another, one panel per family, both geometries."""
+def estimator_series(path: Path) -> list[tuple[str, dict]]:
+    """(label, data) series of one estimator's output; a PCA dir gives PCs-for-90% and PR."""
+    jsonl = path / "intrinsic_dim.jsonl"
+    est = estimator_of(jsonl)
+    series = [(ESTIMATOR_LABEL[est], load(jsonl))]
+    if est == "pca":
+        series.append((PR_LABEL, load(jsonl, field="pr")))
+    return series
+
+
+def fig_estimators(series: list[tuple[str, dict]], out: Path) -> None:
+    """Family mean profile of every estimator, one panel per family, both geometries."""
+    log = any(label.startswith("PCA") for label, _ in series)
+    data = series[0][1]
     for prep in ("raw", "prh"):
         fams = by_family(data, prep)
         if not fams:
             continue
         fig, axes = plt.subplots(2, 4, figsize=(15, 6.4), sharex=True, sharey=True)
         for ax, (fam, models) in zip(axes.flat, fams.items(), strict=False):
-            for c, src, label in ((SERIES[0], data, YLABEL[0]), (SERIES[1], other, other_label)):
+            for c, (label, src) in zip(SERIES, series, strict=False):
                 ys = np.array([np.interp(GRID_DEPTH, *profile(src[(m, prep)])) for m in models])
                 ax.fill_between(GRID_DEPTH, ys.min(0), ys.max(0), color=c, alpha=0.18, lw=0)
                 ax.plot(GRID_DEPTH, ys.mean(0), color=c, label=label)
             ax.set_title(f"{fam} ({len(models)} models)", color=INK)
-            ax.set_ylim(bottom=0)
+            if log:
+                ax.set_yscale("log")
+            else:
+                ax.set_ylim(bottom=0)
             ax.legend(frameon=False, fontsize=7, loc="best")
         for ax in axes.flat[len(fams) :]:
             ax.set_visible(False)
         for ax in axes[-1]:
             ax.set_xlabel("relative depth")
         for ax in axes[:, 0]:
-            ax.set_ylabel("intrinsic dimension")
+            ax.set_ylabel("dimension" + (" (log scale)" if log else ""))
         fig.suptitle(
             f"Estimators compared, n = 1024 - {PREP_TITLE[prep]} (line = family mean, "
             "band = min..max over sizes)",
@@ -210,6 +232,40 @@ def fig_estimators(data: dict, other: dict, other_label: str, out: Path) -> None
 
 def at_depth(entry: dict, depth: float) -> float:
     return float(np.interp(depth, *profile(entry)))
+
+
+def linearity_summary(series: list[tuple[str, dict]]) -> str:
+    """Family mean of every estimator at depth 0, 0.5, 1, and PCs-for-90% / TwoNN."""
+    named = dict(series)
+    data = series[0][1]
+    lines = ["Linear (PCA) vs nonlinear ID, family mean at relative depth 0 / 0.5 / 1:"]
+    for prep in ("raw", "prh"):
+        fams = by_family(data, prep)
+        if not fams:
+            continue
+        lines.append(f"[{prep}]")
+        for fam, models in fams.items():
+            cells = []
+            for label, src in series:
+                vals = [np.mean([at_depth(src[(m, prep)], d) for m in models]) for d in (0, 0.5, 1)]
+                cells.append(
+                    f"{label.split(',')[0].removeprefix('PCA: ')}: "
+                    + " / ".join(f"{v:.0f}" for v in vals)
+                )
+            pca, twonn = named.get(ESTIMATOR_LABEL["pca"]), named.get("TwoNN")
+            if pca and twonn:
+                r = [
+                    np.mean(
+                        [
+                            at_depth(pca[(m, prep)], d) / at_depth(twonn[(m, prep)], d)
+                            for m in models
+                        ]
+                    )
+                    for d in (0, 0.5, 1)
+                ]
+                cells.append("PCA90/TwoNN: " + " / ".join(f"{v:.1f}" for v in r))
+            lines.append(f"  {fam:<14} " + "  |  ".join(cells))
+    return "\n".join(lines)
 
 
 def summary(data: dict, check: Path | None) -> str:
@@ -256,7 +312,7 @@ def main() -> None:
     parser.add_argument("--root", type=Path, required=True, help="stage-2 output dir")
     parser.add_argument("--check", type=Path, default=None, help="wit1m10k output dir (n check)")
     parser.add_argument(
-        "--other", type=Path, default=None, help="stage-2 dir of another estimator (fig4)"
+        "--other", type=Path, nargs="+", default=[], help="stage-2 dirs of other estimators (fig4)"
     )
     args = parser.parse_args()
     YLABEL[0] = ESTIMATOR_LABEL[estimator_of(args.root / "intrinsic_dim.jsonl")]
@@ -267,10 +323,11 @@ def main() -> None:
         if any(k[1] == prep for k in data):
             fig_profiles(data, prep, out)
     fig_family_means(data, out)
-    if args.other:
-        other = args.other / "intrinsic_dim.jsonl"
-        fig_estimators(data, load(other), ESTIMATOR_LABEL[estimator_of(other)], out)
     text = summary(data, args.check)
+    if args.other:
+        series = [s for d in [args.root, *args.other] for s in estimator_series(d)]
+        fig_estimators(series, out)
+        text += "\n\n" + linearity_summary(series)
     (args.root / "summary_models.txt").write_text(text)
     print(text)
 

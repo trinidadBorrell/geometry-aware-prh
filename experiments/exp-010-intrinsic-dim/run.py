@@ -19,6 +19,7 @@ Estimators (--estimator), `geoprh.intrinsic_dim` via scikit-dimension; exact dup
 dropped first (`n_unique` in the output):
 - lb:    Levina & Bickel 2004 Eqs. 8-9 (`MLE`), averaged over k = 10..20
 - twonn: TwoNN (Facco et al. 2017) as DADApy's `compute_id_2NN`, used by Valeriani et al. 2023
+- pca:   linear dimension, number of PCs for 90% variance ("id") and participation ratio ("pr")
 
     uv run python experiments/exp-010-intrinsic-dim/run.py --out <dir> \\
         --models bigscience/bloomz-560m
@@ -147,8 +148,10 @@ def main() -> None:
                             xl = x[:, layer].numpy()
                             if args.estimator == "lb":
                                 est = idim.levina_bickel(xl, args.k1, args.k2, n_jobs=n_jobs)
-                            else:
+                            elif args.estimator == "twonn":
                                 est = idim.two_nn(xl, n_jobs=n_jobs)
+                            else:
+                                est = idim.pca_dim(xl)
                             rec = {
                                 "model": model,
                                 "data": args.data,

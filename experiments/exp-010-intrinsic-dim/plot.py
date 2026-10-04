@@ -23,7 +23,11 @@ INK, INK_MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3dd", "#fcfcfb"
 ORDINAL = ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]  # blue 250/400/550/700, small -> large n
 PREP_TITLE = {"raw": "raw activations", "prh": "PRH features (q=0.95 clamp, l2 norm)"}
 
-ESTIMATOR_LABEL = {"lb": "Levina-Bickel, k=10..20", "twonn": "TwoNN"}
+ESTIMATOR_LABEL = {
+    "lb": "Levina-Bickel, k=10..20",
+    "twonn": "TwoNN",
+    "pca": "PCA: PCs for 90% variance",
+}
 YLABEL = [ESTIMATOR_LABEL["lb"]]  # set from the data in main()
 
 

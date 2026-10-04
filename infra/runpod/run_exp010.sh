@@ -2,7 +2,7 @@
 # exp-010: Levina-Bickel intrinsic dimension per layer (see experiments/exp-010-intrinsic-dim).
 # CPU pod. STAGE=1: MODELS vs n; STAGE=2: every model at n=1024 (PRH wit_1024), plus the
 # other wit1m10k models at n=1000/10000 to check the model ordering; STAGE=all: both, with all 8
-# wit1m10k models at every n. ESTIMATOR=lb (Levina-Bickel) or twonn (outputs under twonn/).
+# wit1m10k models at every n. ESTIMATOR=lb (Levina-Bickel), twonn or pca (outputs under twonn/, pca/).
 # Launch detached:
 #   ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && STAGE=2 AUTO_TERMINATE=1 nohup bash infra/runpod/run_exp010.sh > /workspace/results/oddharak/exp-010.log 2>&1 < /dev/null &"
 # TERMINATE_DELAY seconds pass between the job's end and the pod removing itself, so the
@@ -44,8 +44,11 @@ job() {
   mkdir -p "$OUT/prh1024"
   $RUN/run.py --out "$OUT/prh1024" --data prh1024 --models all --sizes 1024 --threads "$THREADS" $EST
   $RUN/plot.py --root "$OUT"
-  OTHER=""
-  [ "$OUT" != "$LB_OUT" ] && [ -f "$LB_OUT/prh1024/intrinsic_dim.jsonl" ] && OTHER="--other $LB_OUT/prh1024"
+  OTHER=""  # every other estimator's stage-2 output that exists, for fig4
+  for d in "$LB_OUT" "$LB_OUT/twonn" "$LB_OUT/pca"; do
+    [ "$d" != "$OUT" ] && [ -f "$d/prh1024/intrinsic_dim.jsonl" ] && OTHER="$OTHER $d/prh1024"
+  done
+  [ -n "$OTHER" ] && OTHER="--other$OTHER"
   $RUN/compare.py --root "$OUT/prh1024" --check "$OUT" $OTHER
 }
 

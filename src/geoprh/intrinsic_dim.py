@@ -22,6 +22,7 @@ from __future__ import annotations
 import numpy as np
 import skdim
 from skdim._commonfuncs import get_nn
+from sklearn.decomposition import PCA
 
 
 def levina_bickel(x, k1: int = 10, k2: int = 20, n_jobs: int = 1) -> dict:
@@ -50,4 +51,19 @@ def two_nn(x, discard_fraction: float = 0.1, n_jobs: int = 1) -> dict:
     return {"id": float(est.dimension_), "n_unique": len(x)}
 
 
-ESTIMATORS = {"lb": levina_bickel, "twonn": two_nn}
+def pca_dim(x, variance: float = 0.9) -> dict:
+    """Linear dimension from the PCA spectrum (sklearn PCA, centred), via skdim `lPCA`.
+
+    - "id" = "n90": number of principal components needed for `variance` of the total variance
+      (`lPCA(ver="ratio")`); the "PC-ID" Ansuini et al. 2019 compare with the nonlinear ID
+    - "pr": participation ratio (sum lambda)^2 / sum lambda^2 (`lPCA(ver="participation_ratio")`)
+
+    Both are bounded by min(n - 1, d).
+    """
+    ev = PCA().fit(np.asarray(x, dtype=np.float64)).explained_variance_
+    n90 = skdim.id.lPCA(ver="ratio", alphaRatio=variance, fit_explained_variance=True).fit(ev)
+    pr = skdim.id.lPCA(ver="participation_ratio", fit_explained_variance=True).fit(ev)
+    return {"id": int(n90.dimension_), "n90": int(n90.dimension_), "pr": float(pr.dimension_)}
+
+
+ESTIMATORS = {"lb": levina_bickel, "twonn": two_nn, "pca": pca_dim}

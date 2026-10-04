@@ -78,3 +78,22 @@ def test_two_nn_recovers_dimension_of_embedded_gaussian(m):
     basis = np.linalg.qr(rng.standard_normal((200, m)))[0]
     x = rng.standard_normal((4000, m)) @ basis.T + 5.0
     assert idim.two_nn(x)["id"] == pytest.approx(m, rel=0.15)
+
+
+def test_pca_dim_matches_spectrum():
+    rng = np.random.default_rng(5)
+    x = rng.standard_normal((500, 30)) * np.linspace(3, 0.1, 30)  # anisotropic spectrum
+    lam = np.sort(np.linalg.eigvalsh(np.cov(x, rowvar=False)))[::-1]
+    frac = np.cumsum(lam) / lam.sum()
+    res = idim.pca_dim(x)
+    assert res["n90"] == int(np.argmax(frac >= 0.9)) + 1
+    assert res["pr"] == pytest.approx(lam.sum() ** 2 / (lam**2).sum(), rel=1e-8)
+
+
+def test_pca_dim_of_flat_subspace():
+    rng = np.random.default_rng(6)
+    basis = np.linalg.qr(rng.standard_normal((100, 5)))[0]
+    x = rng.standard_normal((2000, 5)) @ basis.T + 1e-4 * rng.standard_normal((2000, 100))
+    res = idim.pca_dim(x)
+    assert res["n90"] == 5
+    assert res["pr"] == pytest.approx(5, rel=0.1)
