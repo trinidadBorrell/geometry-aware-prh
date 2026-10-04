@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-pip install -r requirements.txt
+# pip install -r requirements.txt
 cd geometry_aware_convergence
 
 LLM_MODELS=(

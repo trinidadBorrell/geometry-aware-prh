@@ -15,6 +15,7 @@ from utils import *
 
 def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, device="cuda:0"):
     save_path = os.path.join(args.output_dir, f"{model.replace('/', '_')}_dists.npy")
+    print(save_path)
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     feats = torch.load(feat_path, map_location="cpu")["feats"]
