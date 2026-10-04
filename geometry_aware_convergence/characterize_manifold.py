@@ -13,31 +13,23 @@ from pprint import pprint
 
 from utils import *
 
-    
 def compute_distances(feat_path, model, normalize=True):
-    
     os.makedirs(args.output_dir, exist_ok=True)
 
     raw_x = torch.load(feat_path, map_location="cuda:0")["feats"]
-    if isinstance(raw_x, torch.Tensor):
-        x_feats = prepare_features(raw_x.float(), exact=False)
-    else:
-        x_feats = [prepare_features(layer.float(), exact=False) for layer in raw_x]
+    x_feats = prepare_features(raw_x.float(), exact=False)
+    del raw_x
+    torch.cuda.empty_cache()
 
-    pairwise_dists = []
-    for l, x in enumerate(x_feats):
+    n, num_layers = x_feats.shape[0], x_feats.shape[1]
+    pairwise_dists = np.empty((num_layers, n, n), dtype=np.float32)
+    for l in range(num_layers):
+        x = x_feats[:, l, :]
         if normalize:
-            x_aligned = F.normalize(x, p=2, dim=-1)
+            x = F.normalize(x, p=2, dim=-1)
+        pairwise_dists[l] = (x @ x.T).cpu().numpy()
 
-        # TODO: More distance metrics!
-
-        K = x_aligned @ x_aligned.T
-        pairwise_dists.append(K.cpu())
-    pairwise_dists = np.array(pairwise_dists)
-    
-    np.save(os.path.join(args.output_dir, f'{model}_dists.npy'), {
-            "pairwise_dists": pairwise_dists,
-    })
+    np.save(os.path.join(args.output_dir, f"{model}_dists.npy"), pairwise_dists)
 
 
 if __name__ == "__main__":
