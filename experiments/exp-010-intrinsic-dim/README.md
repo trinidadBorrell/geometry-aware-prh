@@ -1,6 +1,6 @@
 # exp-010: intrinsic dimension of the representations, per layer and vs sample size
 
-**Status:** stage 1 done · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-010-intrinsic-dim/`
+**Status:** stage 1 and 2 done · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-010-intrinsic-dim/`
 
 ## Idea
 
@@ -96,8 +96,44 @@ Caveats: one model; mean pooling only; Levina-Bickel only (no TwoNN/GRIDE cross-
 per-k values (stored in `id_k`) fall with k (layer 0 raw at 10k: 74 at k = 10, 64 at k = 20),
 so the k = 10..20 average is itself scale dependent.
 
-## Next (stage 2)
+## Results (stage 2: all 27 models at n = 1024)
 
-- Fix n = 1024 (PRH `wit_1024` cache, all 27 models) and compare the ID profile over relative
-  depth across LLM and ViT families, PRH geometry as primary.
-- Check on the 8 models with 10240 samples that the model ordering at n = 1024 matches n = 10240.
+Run 2026-10-04, commit `e752f73`, RTX PRO 4000 pod (CPU pods unavailable), ~25 min. Data: PRH
+`wit_1024` (10 LLMs, 17 ViTs), one set. Plus a check on the 7 other wit1m10k models at n = 1000
+(10 sets) and 10000. Outputs in `.../exp-010-intrinsic-dim/prh1024/` (`summary_models.txt`,
+`fig2_profiles_{raw,prh}`, `fig3_family_means`); the check models were appended to the stage-1
+`intrinsic_dim.jsonl`. Relative depth = layer / (L-1); ViT layer 0 is block 0 (no patch-embedding
+layer in the cache).
+
+**1. LLMs and ViTs have opposite ID profiles.** In the PRH geometry:
+- LLMs: ID is highest at the embeddings (49-61) and falls with depth to ~27-30 around 80% depth,
+  with a small rise before the last layer (LLaMA, OpenLLaMA) and a final value of 28-35. The three
+  families nearly coincide; model size matters little (bloomz 560m -> 7b1 shifts the profile up by
+  ~3).
+- ViTs: ID is lowest early (7-11) and rises with depth to 20-44 at the last block. Families
+  differ: supervised IN21k and CLIP-ft-IN12k rise steadily to 35-44; CLIP to ~25-30; MAE stays
+  flat at ~20; DINOv2 is flat at ~15 until the last few blocks, then jumps to 24-39. Larger ViTs
+  end higher (IN21k: tiny 21 -> large 44).
+- So the two modalities move toward each other and meet in the ~20-35 range in their late layers,
+  where cross-modal alignment is usually measured to peak. Whether that coincidence is meaningful
+  is untested here.
+
+**2. Raw vs PRH.** For LLMs the raw profile has an abrupt drop early (bloomz between 15% and 25%
+depth, OpenLLaMA/LLaMA at ~10%), to ~20-25, where PRH declines smoothly, as in stage 1 for
+bloomz-560m. ViT profiles are nearly the same in both geometries.
+
+**3. The model ordering holds across n.** On the 8 models with 10240 samples, Spearman of the
+model ordering at n = 1000 vs n = 10000, at relative depth 0 / 0.25 / 0.5 / 0.75 / 1:
+PRH 0.98 / 0.98 / 0.98 / 1.00 / 1.00; raw 1.00 / 0.95 / 0.90 / 0.90 / 0.93. Comparing models at
+n = 1024 is therefore sound for the PRH geometry, as the absolute values are biased low.
+
+Caveats: one sample set at n = 1024 (stage 1 puts set-to-set sd at ~0.5-2); mean-pooled text vs
+CLS-token images, so pooling differs between modalities; Levina-Bickel only.
+
+## Next
+
+- Test the manifold / non-linearity question directly: compare linear dimension (PCA participation
+  ratio, number of PCs for 90% variance) with the nonlinear ID per layer; scale-dependent ID
+  (GRIDE) to see whether a plateau exists; multiscale local PCA for curvature.
+- Relate the per-layer ID of each model pair to their alignment (CKA, mutual kNN) at that layer
+  pair.
