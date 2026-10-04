@@ -45,7 +45,8 @@ def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, de
 
         out[l] = s[:, k_idx]
 
-    arrays = {k: v.cpu().numpy() for k, v in out.items(), 'ks': KS}
+    arrays = {k: v.cpu().numpy() for k, v in out.items()}
+    arrays['ks'] = KS
     np.save(save_path, arrays)
 
 if __name__ == "__main__":
