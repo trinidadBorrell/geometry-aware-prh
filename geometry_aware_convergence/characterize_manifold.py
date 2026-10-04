@@ -13,23 +13,29 @@ from pprint import pprint
 
 from utils import *
 
-def compute_distances(feat_path, model, normalize=True):
-    os.makedirs(args.output_dir, exist_ok=True)
+def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, device="cuda:0"):
+    save_path = os.path.join(args.output_dir, f"{model.replace('/', '_')}_dists.npy")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    raw_x = torch.load(feat_path, map_location="cuda:0")["feats"]
-    x_feats = prepare_features(raw_x.float(), exact=False)
-    del raw_x
-    torch.cuda.empty_cache()
+    feats = torch.load(feat_path, map_location="cpu")["feats"]
+    n, num_layers, _ = feats.shape
 
-    n, num_layers = x_feats.shape[0], x_feats.shape[1]
-    pairwise_dists = np.empty((num_layers, n, n), dtype=np.float32)
+    row_qs = []
+    for i in range(0, n, row_chunk):
+        block = feats[i:i + row_chunk].to(device).float().abs().flatten(start_dim=1)
+        row_qs.append(torch.quantile(block, q, dim=1))
+        del block
+    q_val = torch.cat(row_qs).mean()
+
+    dists = np.empty((num_layers, n, n), dtype=np.float32)
     for l in range(num_layers):
-        x = x_feats[:, l, :]
+        x = feats[:, l, :].to(device).float().clamp(-q_val, q_val)
         if normalize:
             x = F.normalize(x, p=2, dim=-1)
-        pairwise_dists[l] = (x @ x.T).cpu().numpy()
+        dists[l] = (x @ x.T).cpu().numpy()
+        del x
 
-    np.save(os.path.join(args.output_dir, f"{model}_dists.npy"), pairwise_dists)
+    np.save(save_path, dists)
 
 
 if __name__ == "__main__":
