@@ -79,4 +79,4 @@ if __name__ == "__main__":
     else:
         feat_path = to_feature_filename(args.input_dir, args.modality, args.model_name)
 
-    compute_distances(feat_path, args.model_name, args.layer)
+    compute_distances(feat_path, args.model_name)
