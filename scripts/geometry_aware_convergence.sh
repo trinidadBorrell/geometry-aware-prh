@@ -9,8 +9,8 @@ LVM=vit_base_patch14_dinov2.lvd142m
 
 # "x_file|y_file|output_dir" per dataset
 SETTINGS=(
-    "$FEATS/wit_1024/${LLM}_pool-avg.pt|$FEATS/wit_1024/${LVM}_pool-cls.pt|$RESULTS/revision_1001/alignment_1024"
-    "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/revision_1001/alignment_10k"
+    "$FEATS/wit_1024/${LLM}_pool-avg.pt|$FEATS/wit_1024/${LVM}_pool-cls.pt|$RESULTS/revision_1004/alignment_1024"
+    "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/revision_1004/alignment_10k"
 )
 
 align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
@@ -30,7 +30,7 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
 }
 
 # sweep mutual_knn --topk 5 10 20 50 100 200 500 1000
-# sweep mutual_nd --dist 0.85 0.8 0.75 0.7 0.65 0.6
+sweep mutual_nd --dist 0.85 0.8 0.75 0.7 0.65 0.6
 
 # sweep cknna_local --topk 5 10 20 50 100 200 500 1000
 # sweep cknda_local --dist 0.99 0.98 0.97 0.96 0.95 0.94 0.93 0.92 0.91 0.9
