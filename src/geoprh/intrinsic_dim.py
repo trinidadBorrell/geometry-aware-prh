@@ -60,7 +60,10 @@ def pca_dim(x, variance: float = 0.9) -> dict:
 
     Both are bounded by min(n - 1, d).
     """
-    ev = PCA().fit(np.asarray(x, dtype=np.float64)).explained_variance_
+    x = np.asarray(x, dtype=np.float64)
+    # same spectrum either way; the d x d covariance is much cheaper when n >= d
+    solver = "covariance_eigh" if x.shape[0] >= x.shape[1] else "full"
+    ev = PCA(svd_solver=solver).fit(x).explained_variance_
     n90 = skdim.id.lPCA(ver="ratio", alphaRatio=variance, fit_explained_variance=True).fit(ev)
     pr = skdim.id.lPCA(ver="participation_ratio", fit_explained_variance=True).fit(ev)
     return {"id": int(n90.dimension_), "n90": int(n90.dimension_), "pr": float(pr.dimension_)}

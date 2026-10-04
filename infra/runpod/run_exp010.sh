@@ -23,6 +23,9 @@ CHECK_MODELS=${CHECK_MODELS:-bigscience/bloomz-1b1,bigscience/bloomz-1b7,vit_tin
 THREADS=${THREADS:-$(nproc)}
 AUTO_TERMINATE=${AUTO_TERMINATE:-0}
 TERMINATE_DELAY=${TERMINATE_DELAY:-0}
+# nproc reports the host's cores (48 on an RTX PRO 4000 pod with 12 vCPUs); without a cap
+# OpenBLAS starts one thread per host core and a 1000 x 1024 PCA takes minutes instead of 0.4 s
+export OMP_NUM_THREADS=$THREADS OPENBLAS_NUM_THREADS=$THREADS MKL_NUM_THREADS=$THREADS
 RUN="uv run python experiments/exp-010-intrinsic-dim"
 EST="--estimator $ESTIMATOR"
 
