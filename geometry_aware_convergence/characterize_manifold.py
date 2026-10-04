@@ -15,8 +15,9 @@ from utils import *
 
 # Saves a dict with key = layer num, and N x N_K samples where each 1 of N_K rows is KS[i] nearest neighbor
 def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, device="cuda:0"):
-    save_path = os.path.join(args.output_dir, f"{model.replace('/', '_')}_stats.npz")
+    save_path = os.path.join(args.output_dir, f"{model.replace('/', '_')}_stats.npy")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    print("SAVE PATH", save_path)
 
     feats = torch.load(feat_path, map_location="cpu")["feats"]
     n, num_layers, _ = feats.shape
@@ -44,8 +45,8 @@ def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, de
 
         out[l] = s[:, k_idx]
 
-    arrays = {k: v.cpu().numpy() for k, v in out.items()}
-    np.save(save_path, arrays, ks=KS)
+    arrays = {k: v.cpu().numpy() for k, v in out.items(), 'ks': KS}
+    np.save(save_path, arrays)
 
 if __name__ == "__main__":
     """
