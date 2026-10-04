@@ -12,15 +12,12 @@ from tasks import get_models
 from pprint import pprint
 
 from utils import *
-KS = [1, 5, 10, 20, 50, 100]
-QS = [0.05, 0.25, 0.5, 0.75, 0.95]
-CUTOFFS = [0.5, 0.6, 0.7, 0.8, 0.9, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]
 
 def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, device="cuda:0"):
     save_path = os.path.join(args.output_dir, f"{model.replace('/', '_')}_stats.npz")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    feats = torch.load(feat_path, map_location="cpu")["feats"]  # (N, L, D)
+    feats = torch.load(feat_path, map_location="cpu")["feats"]
     n, num_layers, _ = feats.shape
 
     row_qs = []
@@ -31,10 +28,11 @@ def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, de
     q_val = torch.cat(row_qs).mean()
 
     eye = torch.eye(n, dtype=torch.bool, device=device)
-    q_idx = [int(round(p * (n - 2))) for p in QS]
+
+    KS = [1, 5, 10, 20, 50, 100] if '1024' in model else [10, 50, 100, 200, 500, 100]
     k_idx = [n - 1 - k for k in KS]
 
-    out = {k: [] for k in ["min", "max", "mean", "std", "quantiles", "knn_sims", "cutoff_counts"]}
+    out = {}
     for l in range(num_layers):
         x = feats[:, l, :].to(device).float().clamp(-q_val, q_val)
         if normalize:
@@ -43,17 +41,10 @@ def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, de
         s = K[~eye].view(n, n - 1).sort(dim=1).values
         del K, x
 
-        out["min"].append(s[:, 0])
-        out["max"].append(s[:, -1])
-        out["mean"].append(s.mean(dim=1))
-        out["std"].append(s.std(dim=1))
-        out["quantiles"].append(s[:, q_idx])
-        out["knn_sims"].append(s[:, k_idx])
-        out["cutoff_counts"].append(torch.stack([(s >= c).sum(dim=1) for c in CUTOFFS], dim=1))
-        del s
+        out[l] = s[:, k_idx]
 
     arrays = {k: torch.stack(v).cpu().numpy() for k, v in out.items()}
-    np.savez_compressed(save_path, **arrays, qs=QS, ks=KS, cutoffs=CUTOFFS)
+    np.save(save_path, arrays, ks=KS)
 
 if __name__ == "__main__":
     """
