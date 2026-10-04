@@ -32,7 +32,7 @@ def compute_distances(feat_path, model, normalize=True):
         # TODO: More distance metrics!
 
         K = x_aligned @ x_aligned.T
-        pairwise_dists.append(K)
+        pairwise_dists.append(K.cpu())
     pairwise_dists = np.array(pairwise_dists)
     
     np.save(os.path.join(args.output_dir, f'{model}_dists.npy'), {
