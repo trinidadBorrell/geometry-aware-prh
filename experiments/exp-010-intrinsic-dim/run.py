@@ -1,12 +1,14 @@
 """exp-010: Levina-Bickel intrinsic dimension per layer, vs number of samples.
 
-Data: exp-006's cached activations of the first 10240 WIT-1M samples
-(`askoepke_wit_1m_recaptioned_first10240-original_pool-{avg,cls}`; LLM: every hidden state,
-mean-pooled over the caption; ViT: every block's CLS token).
+Data (--data), LLM: every hidden state mean-pooled over the caption; ViT: every block's CLS token:
+- wit1m10k: exp-006's cached activations of the first 10240 WIT-1M samples
+  (`askoepke_wit_1m_recaptioned_first10240-original_pool-{avg,cls}`), 8 models
+- prh1024:  the PRH `wit_1024` set (`minhuh_prh_wit_1024_pool-{avg_cid-0,cls}`), every model of
+  the val grid (10 LLMs, 17 ViTs)
 
-Sample sets: for each n in --sizes, the disjoint row blocks [n s, n (s+1)) that fit in 10240,
-i.e. 10 x 1000, 5 x 2000, 2 x 5000, 1 x 10000. Every set gives one estimate per layer, so the
-spread at each n is the variability across sample sets.
+Sample sets: for each n in --sizes, the disjoint row blocks [n s, n (s+1)) that fit in the data,
+e.g. 10 x 1000, 5 x 2000, 2 x 5000, 1 x 10000 of 10240. Every set gives one estimate per layer, so
+the spread at each n is the variability across sample sets.
 
 Geometries (--preps):
 - raw: the activations as cached
@@ -18,6 +20,8 @@ averaged over k = 10..20; exact duplicate rows dropped first (`n_unique` in the 
 
     uv run python experiments/exp-010-intrinsic-dim/run.py --out <dir> \\
         --models bigscience/bloomz-560m
+    uv run python experiments/exp-010-intrinsic-dim/run.py --out <dir> --data prh1024 \\
+        --models all --sizes 1024
     uv run python experiments/exp-010-intrinsic-dim/run.py --out <dir> --inventory
 """
 
@@ -36,18 +40,21 @@ from aristotelian.prh.preprocess import prepare_features
 from geoprh import activation_cache as ac
 from geoprh import intrinsic_dim as idim
 
-N_TOTAL = 10240
-DATASET, SUBSET = "askoepke/wit_1m_recaptioned", f"first{N_TOTAL}-original"
+DATA = {  # name: (dataset, subset, caption_idx of the text features)
+    "wit1m10k": ("askoepke/wit_1m_recaptioned", "first10240-original", None),
+    "prh1024": ("minhuh/prh", "wit_1024", 0),
+}
 
 
-def variant(model: str) -> ac.Variant:
+def variant(model: str, data: str = "wit1m10k") -> ac.Variant:
     # HF language models are "org/name", timm vision models have no "/"
     language = "/" in model
+    dataset, subset, cid = DATA[data]
     return ac.Variant(
-        dataset=DATASET,
-        subset=SUBSET,
+        dataset=dataset,
+        subset=subset,
         pool="avg" if language else "cls",
-        caption_idx=None,
+        caption_idx=cid if language else None,
         modality="language" if language else "vision",
     )
 
@@ -86,7 +93,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--root", type=Path, default=None, help="activation cache root")
-    parser.add_argument("--models", default="bigscience/bloomz-560m")
+    parser.add_argument("--data", choices=list(DATA), default="wit1m10k")
+    parser.add_argument("--models", default="bigscience/bloomz-560m", help="comma list or all")
     parser.add_argument("--sizes", default="1000,2000,5000,10000")
     parser.add_argument("--preps", default="raw,prh")
     parser.add_argument("--k1", type=int, default=10)
@@ -113,9 +121,14 @@ def main() -> None:
     (args.out / "meta.json").write_text(json.dumps(meta, indent=2))
 
     sizes = [int(s) for s in args.sizes.split(",")]
+    if args.models == "all":  # every model with this data cached
+        rows = inventory(root)
+        models = [r["model"] for r in rows if r["key"] == variant(r["model"], args.data).key]
+    else:
+        models = args.models.split(",")
     with (args.out / "intrinsic_dim.jsonl").open("a") as fout:
-        for model in args.models.split(","):
-            var = variant(model)
+        for model in models:
+            var = variant(model, args.data)
             payload = ac.load_model(root, model, var)
             if payload is None:
                 print(f"[skip] {model}: not fully cached ({var.key})")
@@ -123,7 +136,7 @@ def main() -> None:
             feats = payload["feats"]
             print(f"{model}: feats {tuple(feats.shape)}", flush=True)
             for n in sizes:
-                for s in range(N_TOTAL // n):
+                for s in range(feats.shape[0] // n):
                     for prep in args.preps.split(","):
                         t0 = time.time()
                         x = layers(feats[n * s : n * (s + 1)], prep)
@@ -133,6 +146,7 @@ def main() -> None:
                             )
                             rec = {
                                 "model": model,
+                                "data": args.data,
                                 "modality": var.modality,
                                 "num_layers": x.shape[1],
                                 "layer": layer,
