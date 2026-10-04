@@ -1,6 +1,6 @@
 # exp-010: intrinsic dimension of the representations, per layer and vs sample size
 
-**Status:** stages 1-2 and TwoNN check done · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-010-intrinsic-dim/`
+**Status:** stages 1-2, TwoNN check and PCA comparison done · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-010-intrinsic-dim/`
 
 ## Idea
 
@@ -168,9 +168,67 @@ captions: layer 0 is then a bag-of-words average, which plausibly carries the hi
 a single last token at layer 0 is one vocabulary embedding with low ID. Pooling is the most likely
 cause; testing it needs a new extraction with last-token pooling.
 
+## Results (linear vs nonlinear dimension: PCA)
 
-- Test the manifold / non-linearity question directly: compare linear dimension (PCA participation
-  ratio, number of PCs for 90% variance) with the nonlinear ID per layer; scale-dependent ID
-  (GRIDE) to see whether a plateau exists; multiscale local PCA for curvature.
-- Relate the per-layer ID of each model pair to their alignment (CKA, mutual kNN) at that layer
-  pair.
+Question: do the representations lie in a linear subspace of about the ID, or is the structure
+nonlinear? Run 2026-10-04, commit `af77628`, RTX PRO 4000, ~45 min, same data and sets as before.
+Outputs in `.../exp-010-intrinsic-dim/pca/` (`prh1024/fig4_estimators_{raw,prh}` puts all four
+measures on one log axis per family; `prh1024/summary_models.txt` ends with the table below).
+
+**Measures.** sklearn PCA spectrum (centred), dimensions from `skdim.id.lPCA`: the number of
+components for 90% of the variance ("PCA90", the PC-ID of Ansuini et al. 2019) and the
+participation ratio PR = (sum lambda)^2 / sum lambda^2. Reading: data on a flat m-dimensional
+subspace gives PCA90 <= m, so PCA90 / ID ~ 1 (a test on a flat 5-d subspace gives 5 / 5).
+PCA90 / ID >> 1 means the data is not flat at the scale of the dataset.
+
+PRH features, n = 1024, family mean at relative depth 0 / 0.5 / 1:
+
+| family | PCA90 | PR | TwoNN | PCA90 / TwoNN |
+|---|---|---|---|---|
+| BLOOMZ | 510 / 391 / 455 | 186 / 102 / 120 | 52 / 31 / 29 | 9.7 / 12.8 / 16.1 |
+| OpenLLaMA | 565 / 517 / 542 | 173 / 59 / 117 | 45 / 27 / 24 | 12.7 / 19.0 / 22.7 |
+| LLaMA | 534 / 560 / 500 | 144 / 163 / 44 | 40 / 22 / 25 | 13.3 / 25.0 / 20.0 |
+| ViT IN21k | 7 / 76 / 294 | 5 / 24 / 161 | 12 / 19 / 23 | 0.6 / 3.8 / 12.3 |
+| MAE | 6 / 96 / 143 | 4 / 19 / 26 | 8 / 18 / 20 | 0.8 / 5.0 / 7.0 |
+| DINOv2 | 9 / 51 / 366 | 6 / 13 / 188 | 10 / 16 / 14 | 0.9 / 3.1 / 26.2 |
+| CLIP ft-IN12k | 7 / 122 / 427 | 5 / 26 / 216 | 12 / 20 / 24 | 0.6 / 5.8 / 17.9 |
+| CLIP | 7 / 174 / 350 | 6 / 28 / 144 | 12 / 21 / 20 | 0.5 / 8.1 / 17.1 |
+
+**1. ViTs go from linear to nonlinear with depth.** In the first block PCA90 (4-15) is at or
+below the ID: the CLS representations sit in a low-dimensional, essentially flat subspace. The
+ratio then grows steadily, to 7 (MAE) - 26 (DINOv2) at the last block. MAE stays the most linear
+(PR ~ ID ~ 20 over the second half of the network).
+
+**2. LLMs are strongly nonlinear at every depth, including the embeddings.** PCA90 is 400-560
+against an ID of 22-52 (ratio 10-25), and even PR, which is dominated by the top eigenvalues, is
+2-7x the ID.
+
+**3. Sample size: the ViT linear dimension is converged, the LLM one is not.** On the wit1m10k
+models from n = 1000 to 10000, ViT PCA90 is unchanged in the first block (e.g. 4 -> 4, 10 -> 10)
+and grows 10-40% in the last; bloomz PCA90 roughly doubles (bloomz-1b7 layer 0: 534 -> 1107; last
+layer: 461 -> 988) while TwoNN stays flat. The LLM spectrum is heavy-tailed: no linear dimension
+captures 90% of the variance at these n, so the LLM ratios above are lower bounds. PR moves much
+less (+10-30%).
+
+**4. Raw LLM activations: one direction carries the variance.** In the raw geometry PCA90 is
+1-2 at mid depth for every LLM family (PR ~ 1): a single outlier direction holds > 90% of the
+variance. This supports the massive-activation reading of the abrupt raw-ID drop in stages 1-2.
+The PRH clamp + l2 norm removes it.
+
+**What this says about linearity.** A flat subspace of about the ID is ruled out for every LLM
+layer and for mid-to-late ViT layers: such a subspace would hold 90% of the variance in about ID
+components, and 3-26x more are needed (lower bounds for LLMs). Early ViT blocks are consistent
+with a near-linear representation. PCA vs ID cannot tell *which* nonlinearity: a curved manifold,
+a union of separated clusters (each locally low-dimensional), or a heavy-tailed spread of
+low-variance directions all give PCA90 >> ID. For PRH this matters directly: linear CKA is driven
+by the global (PCA) structure and mutual kNN by the local one, and for LLMs these differ by an
+order of magnitude in dimension at every layer.
+
+## Next
+
+- Separate curvature from clustering: local PCA on growing kNN neighbourhoods (on a curved
+  manifold the local linear dimension is ~ID at small radius and grows with it), and graph-geodesic
+  vs Euclidean distances. Scale-dependent ID (GRIDE) for the plateau.
+- Last-token pooling for the LLMs, to test whether pooling explains the missing mid-depth peak.
+- Relate the per-layer ID and PCA90 / ID of each model pair to their alignment (CKA, mutual kNN)
+  at that layer pair.
