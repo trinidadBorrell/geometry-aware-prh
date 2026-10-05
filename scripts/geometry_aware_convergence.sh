@@ -10,7 +10,7 @@ LVM=vit_base_patch14_dinov2.lvd142m
 # "x_file|y_file|output_dir" per dataset
 SETTINGS=(
     "$FEATS/wit_1024/${LLM}_pool-avg.pt|$FEATS/wit_1024/${LVM}_pool-cls.pt|$RESULTS/revision_1004/alignment_1024"
-    "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/revision_1004/alignment_10k"
+    # "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/revision_1004/alignment_10k"
 )
 
 align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
