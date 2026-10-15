@@ -54,7 +54,7 @@ decord
 ftfy
 tables
 zarr
-
+ot
 
 torch>=2.1.2
 torchvision
