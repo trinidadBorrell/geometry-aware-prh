@@ -55,6 +55,7 @@ ftfy
 tables
 zarr
 POT
+pyDiffMap
 
 torch>=2.1.2
 torchvision
