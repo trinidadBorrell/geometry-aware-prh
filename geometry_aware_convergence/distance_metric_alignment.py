@@ -47,8 +47,9 @@ def diffusion_fit_transform(X, dmap):
 
 def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95):
     if dist == "diffusion":
-        dmap = diffusion_map.DiffusionMap.from_sklearn(n_evecs=3, epsilon='bgh', alpha=0.5, k=64)
-        dist_metric = lambda x: diffusion(x, dmap)
+        # dmap = diffusion_map.DiffusionMap.from_sklearn(n_evecs=3, epsilon='bgh', alpha=0.5, k=64)
+        # dist_metric = lambda x: diffusion(x, dmap)
+        dist_metric = lambda x: diffusion(x)
     C_x = dist_metric(X)
     C_y = dist_metric(Y)
 
