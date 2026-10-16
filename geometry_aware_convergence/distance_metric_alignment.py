@@ -172,7 +172,7 @@ if __name__ == "__main__":
     model_x_name = args.input_file_x.split('/')[-1][:-3]
     model_y_name = args.input_file_y.split('/')[-1][:-3]
     print('MODEL X', model_x_name, 'MODEL Y', model_y_name)
-    
+
     save_path = to_alignment_filename(args.output_dir, model_x_name, model_y_name)
     
     if os.path.exists(save_path) and not args.force_remake:
@@ -181,11 +181,6 @@ if __name__ == "__main__":
     
     
     print(f"dataset:\t{args.dataset}")
-    print(f"metric: \t{args.metric}")
-    if 'knn' in args.metric:
-        print(f"topk:\t{args.topk}")
-    if 'nd' in args.metric:
-        print(f"dist:\t{args.dist}")
     
     print('\nmeasuring alignment')
     alignment = compute_alignment(
