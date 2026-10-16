@@ -88,6 +88,8 @@ def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95
         T_shuffle = T[randperm1][randperm2]
         null_scores.append(torch.mean(T_shuffle.diagonal()))
 
+    null_scores = torch.stack(null_scores)
+
     null_quantile = torch.quantile(null_scores, quantile)
     gated_score = max(0, true_score - null_quantile)
     return true_score, gated_score, gw_dist
