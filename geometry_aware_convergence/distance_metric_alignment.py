@@ -26,6 +26,26 @@ def isomap(X, Y):
     pass
 
 def diffusion(X, n_evecs=3, k=64, alpha=0.5, t=1):
+    def pairwise_dist(X):
+        dist_sq = 2 * torch.sum(X**2) - 2 * X @ X.T
+        dist_sq = torch.clip(dist_sq, min=0)
+        return torch.sqrt(dist_sq)
+    X = X.detach().double().numpy()
+    D = pairwise_dist(X)
+    eps = torch.median(torch.sort(D, 1)[:, k]) ** 2
+    W = torch.exp(-D**2 / eps)
+    q = W.sum(1)
+    W = W / torch.outer(q**alpha, q**alpha)
+    d = W.sum(1)
+    S = W / torch.sqrt(torch.outer(d, d))
+    evals, evecs = torch.linalg.eigh(S)
+    idx = torch.argsort(-evals)[: n_evecs + 1]
+    evals, evecs = evals[idx], evecs[:, idx]
+    psi = evecs / torch.sqrt(d)[:, None]
+    emb = psi[:, 1:] * evals[1:] ** t
+    return pairwise_dist(emb)
+
+def diffusion_cpu(X, n_evecs=3, k=64, alpha=0.5, t=1):
     X = X.detach().cpu().double().numpy()
     D = squareform(pdist(X))
     eps = np.median(np.sort(D, 1)[:, k]) ** 2
