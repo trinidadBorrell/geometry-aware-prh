@@ -19,7 +19,7 @@ python distance_metric_alignment.py --input_file_x "$LLAMA7B_PATH" --input_file_
 python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITLARGE_PATH" --output_dir "$OUT_PATH"
 python distance_metric_alignment.py --input_file_x "$LLAMA7B_PATH" --input_file_y "$VITLARGE_PATH" --output_dir "$OUT_PATH"
 
-python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH_BIG" --input_file_y "$VITBASE_PATH_BIG" --output_dir "$OUT_PATH"
+# python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH_BIG" --input_file_y "$VITBASE_PATH_BIG" --output_dir "$OUT_PATH"
 
 
 python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH" --normalize
@@ -28,7 +28,7 @@ python distance_metric_alignment.py --input_file_x "$LLAMA7B_PATH" --input_file_
 python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITLARGE_PATH" --output_dir "$OUT_PATH" --normalize
 python distance_metric_alignment.py --input_file_x "$LLAMA7B_PATH" --input_file_y "$VITLARGE_PATH" --output_dir "$OUT_PATH" --normalize
 
-python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH_BIG" --input_file_y "$VITBASE_PATH_BIG" --output_dir "$OUT_PATH" --normalize
+# python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH_BIG" --input_file_y "$VITBASE_PATH_BIG" --output_dir "$OUT_PATH" --normalize
 
 
 # FEATS=/workspace/hf

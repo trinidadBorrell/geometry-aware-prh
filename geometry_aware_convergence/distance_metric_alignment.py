@@ -30,7 +30,7 @@ def pairwise_sqdist(X):
     D2 = X @ X.T
     return D2.mul_(-2).add_(sq[:, None]).add_(sq[None, :]).clamp_(min=0)
 
-def diffusion(X, n_evecs=3, k=64, alpha=0.5, t=1):
+def diffusion_mem_efficient(X, n_evecs=3, k=64, alpha=0.5, t=1):
     W = pairwise_sqdist(X.detach().double())
     eps = torch.kthvalue(W, k + 1, dim=1).values.median()
     W.div_(-eps).exp_()
@@ -42,13 +42,9 @@ def diffusion(X, n_evecs=3, k=64, alpha=0.5, t=1):
     evals, evecs = evals[-(n_evecs + 1):].flip(0), evecs[:, -(n_evecs + 1):].flip(1)
     return (evecs[:, 1:] / d[:, None]) * evals[1:] ** t
 
-def diffusion_v2(X, n_evecs=3, k=64, alpha=0.5, t=1):
-    def pairwise_dist(X):
-        dist_sq = 2 * torch.sum(X**2) - 2 * X @ X.T
-        dist_sq = torch.clip(dist_sq, min=0)
-        return torch.sqrt(dist_sq)
+def diffusion(X, n_evecs=3, k=64, alpha=0.5, t=1):
     X = X.detach().double()
-    D = pairwise_dist(X)
+    D = pairwise_sqdist(X)
     sorted_vals = torch.sort(D, 1)[0]
     eps = torch.median(sorted_vals[:, k]) ** 2
     W = torch.exp(-D**2 / eps)
@@ -61,7 +57,7 @@ def diffusion_v2(X, n_evecs=3, k=64, alpha=0.5, t=1):
     evals, evecs = evals[idx], evecs[:, idx]
     psi = evecs / torch.sqrt(d)[:, None]
     emb = psi[:, 1:] * evals[1:] ** t
-    return pairwise_dist(emb)
+    return pairwise_sqdist(emb)
 
 def diffusion_cpu(X, n_evecs=3, k=64, alpha=0.5, t=1):
     X = X.detach().cpu().double().numpy()
@@ -89,13 +85,16 @@ def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95
         # dist_metric = lambda x: diffusion(x, dmap)
         dist_metric = lambda x: diffusion(x)
     
-    emb_x = dist_metric(X)
-    emb_y = dist_metric(Y)
+    # emb_x = dist_metric(X)
+    # emb_y = dist_metric(Y)
 
-    C_x = torch.cdist(emb_x, emb_x)
+    # C_x = torch.cdist(emb_x, emb_x)
+
+    C_x = dist_metric(X)
     C_x /= C_x.mean()
 
-    C_y = torch.cdist(emb_y, emb_y)
+    # C_y = torch.cdist(emb_y, emb_y)
+    C_y = dist_metric(Y)
     C_y /= C_y.mean()
 
     T, log = ot.gromov.gromov_wasserstein(C_x, C_y, log=True)
