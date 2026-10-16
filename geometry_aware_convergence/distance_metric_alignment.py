@@ -111,8 +111,10 @@ def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95
     # null_quantile = 1 / T.shape[0] + 1.645*torch.std(T)
     gated_score = max(0, true_score - null_quantile)
 
+    t2 = torch.sum(T**2)
+
     del emb_x, emb_y, C_x, C_y, T
-    return true_score, gated_score, gw_dist, torch.sum(T**2)
+    return true_score, gated_score, gw_dist, t2
     
 
 def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quantile=0.95):
