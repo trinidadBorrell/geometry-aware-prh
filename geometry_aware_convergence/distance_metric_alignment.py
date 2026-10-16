@@ -26,7 +26,7 @@ def isomap(X, Y):
     pass
 
 def diffusion(X, dmap):
-    X_transform = dmap.fit_transform(X)
+    X_transform = dmap.fit_transform(X.cpu())
     return squareform(pdist(X_transform))
 
 def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95):
