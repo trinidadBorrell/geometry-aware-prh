@@ -25,7 +25,23 @@ def causal_inner_product(X, Y):
 def isomap(X, Y):
     pass
 
-def diffusion(X, dmap):
+def diffusion(X, n_evecs=3, k=64, alpha=0.5, t=1):
+    X = X.detach().cpu().double().numpy()
+    D = squareform(pdist(X))
+    eps = np.median(np.sort(D, 1)[:, k]) ** 2
+    W = np.exp(-D**2 / eps)
+    q = W.sum(1)
+    W = W / np.outer(q**alpha, q**alpha)
+    d = W.sum(1)
+    S = W / np.sqrt(np.outer(d, d))
+    evals, evecs = np.linalg.eigh(S)
+    idx = np.argsort(-evals)[: n_evecs + 1]
+    evals, evecs = evals[idx], evecs[:, idx]
+    psi = evecs / np.sqrt(d)[:, None]
+    emb = psi[:, 1:] * evals[1:] ** t
+    return squareform(pdist(emb))
+
+def diffusion_fit_transform(X, dmap):
     X_transform = dmap.fit_transform(X.cpu())
     return squareform(pdist(X_transform))
 
@@ -69,6 +85,8 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
     nc_score_ret = np.zeros((n_layers_x, n_layers_y))
     gw_dist_ret = np.zeros((n_layers_x, n_layers_y))
 
+    pbar = tqdm(total=n_layers_x*n_layers_y)
+
     for i, x in enumerate(x_feats):
         for j, y in enumerate(y_feats):
             if normalize:
@@ -83,6 +101,7 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
             true_score_ret[i, j] = avg
             nc_score_ret[i, j] = nc
             gw_dist_ret[i, j] = gw
+            pbar.update(1)
     return {
         "true_score": true_score_ret,
         "nc_score": nc_score_ret,
