@@ -135,13 +135,10 @@ def compute_alignment(x_fp, y_fp, num_permutations, quantile, precise=True):
 
 
 
-def to_alignment_filename(output_dir, metric, topk, dist, null_calibrate):
-    if null_calibrate:
-        metric += "_NC"
-    dist_flag = f'_d{dist}' if dist > 0 else ''
+def to_alignment_filename(output_dir, model_x, model_y):
     save_path = os.path.join(
         output_dir,
-        f"{metric}_k{topk}{dist_flag}.npy" if ('knn' in metric or 'nd' in metric) else f"{metric}.npy"
+        f"{model_x}_{model_y}.npy"
     )
     return save_path
 
@@ -170,8 +167,13 @@ if __name__ == "__main__":
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
+
+
+    model_x_name = args.input_file_x.split('/')[-1][:-3]
+    model_y_name = args.input_file_y.split('/')[-1][:-3]
+    print('MODEL X', model_x_name, 'MODEL Y', model_y_name)
     
-    save_path = to_alignment_filename(args.output_dir, args.metric, args.topk, args.dist, args.null_calibrate)
+    save_path = to_alignment_filename(args.output_dir, model_x_name, model_y_name)
     
     if os.path.exists(save_path) and not args.force_remake:
         print(f"alignment already exists at {save_path}")
