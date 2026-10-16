@@ -30,7 +30,7 @@ def diffusion(X, n_evecs=3, k=64, alpha=0.5, t=1):
         dist_sq = 2 * torch.sum(X**2) - 2 * X @ X.T
         dist_sq = torch.clip(dist_sq, min=0)
         return torch.sqrt(dist_sq)
-    X = X.detach().double().numpy()
+    X = X.detach().double()
     D = pairwise_dist(X)
     eps = torch.median(torch.sort(D, 1)[:, k]) ** 2
     W = torch.exp(-D**2 / eps)
