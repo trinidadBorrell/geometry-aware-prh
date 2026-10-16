@@ -65,9 +65,9 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
     n_layers_x = len(x_feats)
     n_layers_y = len(y_feats)
 
-    true_score_ret = np.zeros(n_layers_x, n_layers_y)
-    nc_score_ret = np.zeros(n_layers_x, n_layers_y)
-    gw_dist_ret = np.zeros(n_layers_x, n_layers_y)
+    true_score_ret = np.zeros((n_layers_x, n_layers_y))
+    nc_score_ret = np.zeros((n_layers_x, n_layers_y))
+    gw_dist_ret = np.zeros((n_layers_x, n_layers_y))
 
     for i, x in enumerate(x_feats):
         for j, y in enumerate(y_feats):
