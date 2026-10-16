@@ -25,7 +25,24 @@ def causal_inner_product(X, Y):
 def isomap(X, Y):
     pass
 
+def pairwise_sqdist(X):
+    sq = (X * X).sum(1)
+    D2 = X @ X.T
+    return D2.mul_(-2).add_(sq[:, None]).add_(sq[None, :]).clamp_(min=0)
+
 def diffusion(X, n_evecs=3, k=64, alpha=0.5, t=1):
+    W = pairwise_sqdist(X.detach().double())
+    eps = torch.kthvalue(W, k + 1, dim=1).values.median()
+    W.div_(-eps).exp_()
+    q = W.sum(1) ** alpha
+    W.div_(q[:, None]).div_(q[None, :])
+    d = W.sum(1).sqrt_()
+    W.div_(d[:, None]).div_(d[None, :])
+    evals, evecs = torch.linalg.eigh(W)
+    evals, evecs = evals[-(n_evecs + 1):].flip(0), evecs[:, -(n_evecs + 1):].flip(1)
+    return (evecs[:, 1:] / d[:, None]) * evals[1:] ** t
+
+def diffusion_v2(X, n_evecs=3, k=64, alpha=0.5, t=1):
     def pairwise_dist(X):
         dist_sq = 2 * torch.sum(X**2) - 2 * X @ X.T
         dist_sq = torch.clip(dist_sq, min=0)
@@ -71,28 +88,31 @@ def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95
         # dmap = diffusion_map.DiffusionMap.from_sklearn(n_evecs=3, epsilon='bgh', alpha=0.5, k=64)
         # dist_metric = lambda x: diffusion(x, dmap)
         dist_metric = lambda x: diffusion(x)
-    C_x = dist_metric(X)
-    C_y = dist_metric(Y)
+    
+    emb_x = dist_metric(X)
+    emb_y = dist_metric(Y)
+
+    C_x = torch.cdist(emb_x, emb_x)
+    C_x /= C_x.mean()
+
+    C_y = torch.cdist(emb_y, emb_y)
+    C_y /= C_y.mean()
 
     T, log = ot.gromov.gromov_wasserstein(C_x, C_y, log=True)
     gw_dist = log['gw_dist']
 
-    true_score = torch.mean(T.diagonal())
+    true_score = torch.sum(T.diagonal())
 
-    null_scores = []
-
-    for _ in range(n_permutations):
-        randperm1 = torch.randperm(T.shape[0])
-        randperm2 = torch.randperm(T.shape[1])
-
-        T_shuffle = T[randperm1][randperm2]
-        null_scores.append(torch.mean(T_shuffle.diagonal()))
-
-    null_scores = torch.stack(null_scores)
+    n = T.shape[0]
+    perms = torch.argsort(torch.rand(n_permutations, n, device=T.device), dim=1)
+    null_scores = T[perms, torch.arange(n, device=T.device)].sum(1)
 
     null_quantile = torch.quantile(null_scores, quantile)
+    # null_quantile = 1 / T.shape[0] + 1.645*torch.std(T)
     gated_score = max(0, true_score - null_quantile)
-    return true_score, gated_score, gw_dist
+
+    del emb_x, emb_y, C_x, C_y, T
+    return true_score, gated_score, gw_dist, torch.sum(T**2)
     
 
 def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quantile=0.95):
@@ -108,6 +128,7 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
     true_score_ret = np.zeros((n_layers_x, n_layers_y))
     nc_score_ret = np.zeros((n_layers_x, n_layers_y))
     gw_dist_ret = np.zeros((n_layers_x, n_layers_y))
+    t2_sum_ret = np.zeros((n_layers_x, n_layers_y))
 
     pbar = tqdm(total=n_layers_x*n_layers_y)
 
@@ -121,18 +142,21 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
                 y_aligned = y
 
 
-            avg, nc, gw = gromov_wasserstein(x_aligned, y_aligned, n_permutations=num_permutations, quantile=quantile)
+            avg, nc, gw, t2 = gromov_wasserstein(x_aligned, y_aligned, n_permutations=num_permutations, quantile=quantile)
             true_score_ret[i, j] = avg
             nc_score_ret[i, j] = nc
             gw_dist_ret[i, j] = gw
+            t2_sum_ret[i, j] = t2
             pbar.update(1)
     return {
         "true_score": true_score_ret,
         "nc_score": nc_score_ret,
-        "gw_dist": gw_dist_ret
+        "gw_dist": gw_dist_ret,
+        't2_sum': t2_sum_ret,
+
     }
     
-def compute_alignment(x_fp, y_fp, num_permutations, quantile, precise=True):
+def compute_alignment(x_fp, y_fp, num_permutations, quantile, normalize=True, precise=True):
     """
     Args:
         x_fp: x features
@@ -165,8 +189,8 @@ def compute_alignment(x_fp, y_fp, num_permutations, quantile, precise=True):
         y_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_y]
     
     alignment_scores = compute_score(
-        y_feats, x_feats,
-        normalize=True,
+        x_feats, y_feats, 
+        normalize=normalize,
         num_permutations=num_permutations,
         quantile=quantile
     )
@@ -178,10 +202,11 @@ def compute_alignment(x_fp, y_fp, num_permutations, quantile, precise=True):
 
 
 
-def to_alignment_filename(output_dir, model_x, model_y):
+def to_alignment_filename(output_dir, model_x, model_y, normalize):
+    flag = 'norm' if normalize else 'raw'
     save_path = os.path.join(
         output_dir,
-        f"{model_x}_{model_y}.npy"
+        f"{model_x}_{model_y}_{flag}.npy"
     )
     return save_path
 
@@ -199,6 +224,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/alignment")
     parser.add_argument("--precise",        action="store_true")
     parser.add_argument("--force_remake",   action="store_true")
+    parser.add_argument("--normalize",   action="store_true")
 
     parser.add_argument("--num-permutations", type=int, default=200)
     parser.add_argument("--quantile", type=float, default=0.95)
@@ -231,6 +257,7 @@ if __name__ == "__main__":
         args.input_file_y, 
         args.num_permutations,
         args.quantile, 
+        args.normalize,
         args.precise
     )
     alignment["x_model"] = args.input_file_x
