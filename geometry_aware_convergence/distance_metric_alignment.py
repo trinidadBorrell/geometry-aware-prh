@@ -44,8 +44,8 @@ def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95
     null_scores = []
 
     for _ in range(n_permutations):
-        randperm1 = np.random.randperm(T.shape[0])
-        randperm2 = np.random.randperm(T.shape[1])
+        randperm1 = np.random.permutation(T.shape[0])
+        randperm2 = np.random.permutation(T.shape[1])
 
         T_shuffle = T[randperm1][randperm2]
         null_scores.append(np.mean(T_shuffle.diagonal()))
