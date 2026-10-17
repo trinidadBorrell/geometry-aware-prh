@@ -29,6 +29,8 @@ dependencies = [
     "calibrated-similarity",
     "hf-xet>=1.6.0",
     "scikit-dimension>=0.3.7",
+    "graphriccicurvature>=0.5.3.1",
+    "pot>=0.9.7.post1",
 ]
 
 [project.optional-dependencies]
