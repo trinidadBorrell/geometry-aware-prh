@@ -13,6 +13,9 @@ SYN_WORKERS=${SYN_WORKERS:-12}
 MODEL_WORKERS=${MODEL_WORKERS:-8}
 AUTO_TERMINATE=${AUTO_TERMINATE:-0}
 TERMINATE_DELAY=${TERMINATE_DELAY:-0}
+# one BLAS thread per worker process; set before Python starts (numpy reads it at import), else
+# every worker starts one thread per host core and the pod thrashes
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 
 job() {
   set -e

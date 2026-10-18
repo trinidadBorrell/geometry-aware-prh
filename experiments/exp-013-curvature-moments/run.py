@@ -43,8 +43,13 @@ MODELS = [
 
 
 def _single_thread():
+    """Workers run single-threaded; the BLAS variables only take effect if set before numpy is
+    imported, so the launcher (infra/runpod/run_exp013.sh) exports them too."""
     for v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ[v] = "1"
+    from threadpoolctl import threadpool_limits
+
+    threadpool_limits(1)
 
 
 def _curvature(x: np.ndarray, d: int, seed: int) -> dict:
@@ -87,12 +92,14 @@ def synthetic_task(args) -> dict:
 
 def model_task(args) -> list[dict]:
     model, root, seed = args
+    import torch
     import torch.nn.functional as F
 
     from aristotelian.prh.preprocess import prepare_features
     from geoprh import activation_cache as ac
     from geoprh import intrinsic_dim as idim
 
+    torch.set_num_threads(1)
     language = "/" in model
     var = ac.Variant(
         dataset="askoepke/wit_1m_recaptioned",
@@ -176,7 +183,8 @@ def main() -> None:
         tasks = [(m, args.root, args.seed) for m in args.models.split(",")]
         run, fmt = model_task, lambda r: f"{r[0]['model']}: {len(r)} layers"
 
-    with path.open("a") as fout, ProcessPoolExecutor(max_workers=args.workers) as pool:
+    pool = ProcessPoolExecutor(max_workers=args.workers, initializer=_single_thread)
+    with path.open("a") as fout, pool:
         for res in pool.map(run, tasks):
             for r in res if isinstance(res, list) else [res]:
                 fout.write(json.dumps(r) + "\n")
