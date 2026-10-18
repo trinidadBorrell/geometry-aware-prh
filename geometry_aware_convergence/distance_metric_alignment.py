@@ -87,7 +87,9 @@ def identity_cost_null(Cx, Cy, P=200):
         base - 2 * (Cx * Cy[p[:, None], p[None, :]]).mean()
         for p in (torch.randperm(n, device=Cx.device) for _ in range(P))
     ])
-    return obs, null
+
+    null_quantile = torch.quantile(null, 0.95)
+    return obs, max(0, obs - null_quantile)
 
 def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="regular", n_permutations=200, quantile=0.95):
     if dist == "diffusion":
