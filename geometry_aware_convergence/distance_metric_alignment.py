@@ -111,7 +111,7 @@ def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="regular", n_permutations
         gw_dist = log['gw_dist']
     else:
         assert gw_mode == 'entropic'
-        T = ot.gromov.entropic_gromov_wasserstein(C_x, C_y)
+        T = ot.gromov.entropic_gromov_wasserstein(C_x, C_y, epsilon=0.3)
         gw_dist = 0
         
 
