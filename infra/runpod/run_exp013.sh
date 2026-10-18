@@ -8,7 +8,7 @@ export PATH="$HOME/.local/bin:$PATH"
 cd "$(dirname "$0")/../.."
 
 PERSON=${PERSON:-oddharak}
-OUT=/workspace/results/$PERSON/exp-013-curvature-moments
+OUT=/workspace/results/$PERSON/exp-013-curvature-moments/${RUN_TAG:-v2}
 SYN_WORKERS=${SYN_WORKERS:-12}
 MODEL_WORKERS=${MODEL_WORKERS:-8}
 AUTO_TERMINATE=${AUTO_TERMINATE:-0}

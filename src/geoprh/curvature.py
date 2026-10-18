@@ -42,18 +42,31 @@ from sklearn.neighbors import NearestNeighbors
 
 
 def neighbourhood_moments(
-    x: np.ndarray, d: int, ks: list[int], n_centres: int = 300, seed: int = 0, n_jobs: int = 1
+    x: np.ndarray,
+    ds: int | list[int],
+    ks: list[int],
+    n_centres: int = 300,
+    seed: int = 0,
+    n_jobs: int = 1,
 ) -> dict:
-    """Per centre and k: T (tangent variance), V_N (normal variance), m2 = |normal part of p - c|^2.
+    """Per centre, k and tangent dimension d: T (tangent variance), V_N (normal variance per
+    point) and m2 (squared normal offset of p from the neighbourhood centroid).
 
-    Returns {"k": [K], "T": [C, K], "VN": [C, K], "m2": [C, K], "centres": [C]}.
+    Variances use the unbiased 1/(k-1) normalisation, and m2 is corrected for the sampling noise
+    of the centroid: with k neighbours, |normal part of p - c|^2 has expectation
+    |m|^2 + V_N / k, a term that shrinks with k and would otherwise bias |H| low.
+    Several d share one eigendecomposition per neighbourhood.
+
+    Returns {"k": [K], "ds": [D], "centres": [C], "T" / "VN" / "m2": [C, K, D]}.
     """
+    ds = [ds] if isinstance(ds, int) else list(ds)
     rng = np.random.default_rng(seed)
     centres = rng.choice(x.shape[0], min(n_centres, x.shape[0]), replace=False)
-    ks = [k for k in ks if d + 2 <= k < x.shape[0]]
+    ks = [k for k in ks if max(ds) + 2 <= k < x.shape[0]]
     idx = NearestNeighbors(n_neighbors=max(ks) + 1, n_jobs=n_jobs).fit(x)
     idx = idx.kneighbors(x[centres], return_distance=False)
-    out = {key: np.empty((len(centres), len(ks))) for key in ("T", "VN", "m2")}
+    shape = (len(centres), len(ks), len(ds))
+    out = {key: np.empty(shape) for key in ("T", "VN", "m2")}
     for ci, row in enumerate(idx):
         p = x[row[0]]
         for ki, k in enumerate(ks):
@@ -62,13 +75,19 @@ def neighbourhood_moments(
             y = nb - c
             lam, u = np.linalg.eigh(y @ y.T)
             lam, u = lam[::-1].clip(min=0), u[:, ::-1]
-            var = lam / k
-            basis = y.T @ (u[:, :d] / np.sqrt(np.maximum(lam[:d], 1e-300)))  # D x d, orthonormal
+            var = lam / (k - 1)
             off = p - c
-            out["T"][ci, ki] = var[:d].sum()
-            out["VN"][ci, ki] = var[d:].sum()
-            out["m2"][ci, ki] = off @ off - np.sum((basis.T @ off) ** 2)
-    return {"k": ks, "centres": centres, **out}
+            # projections of the offset on every principal direction (orthonormal basis y^T u / sqrt(lam))
+            proj = (u.T @ (y @ off)) / np.sqrt(np.maximum(lam, 1e-300))
+            off2 = off @ off
+            cum_proj = np.cumsum(proj**2)
+            cum_var = np.cumsum(var)
+            for di, d in enumerate(ds):
+                vn = cum_var[-1] - cum_var[d - 1]
+                out["T"][ci, ki, di] = cum_var[d - 1]
+                out["VN"][ci, ki, di] = vn
+                out["m2"][ci, ki, di] = off2 - cum_proj[d - 1] - vn / k
+    return {"k": ks, "ds": ds, "centres": centres, **out}
 
 
 def _slope(t2: np.ndarray, y: np.ndarray) -> tuple[float, float]:
@@ -83,11 +102,35 @@ def _from_slopes(b: float, e: float, d: int) -> tuple[float, float, float]:
     return h2, ii2, h2 - ii2
 
 
+def _select(mom: dict, d: int) -> dict:
+    di = mom["ds"].index(d)
+    return {key: mom[key][:, :, di] for key in ("T", "VN", "m2")}
+
+
+def select_tangent_dim(mom: dict, tol: float = 0.5) -> dict:
+    """Choose d from the scaling of the normal variance (the idea of multiscale SVD, Little,
+    Maggioni & Rosasco): tangent variance grows like r^2 (like T), curvature-driven normal
+    variance like r^4 (like T^2), noise not at all. If d is too small by m, m true tangent
+    directions sit in the "normal" part, each carrying about T/d of variance, so V_N gains a term
+    a T with a ~ m/d. For each candidate d, fit V_N = c + a T + e T^2 over the scales; a * d
+    estimates the number of leaked tangent directions. Return the smallest d where it is < tol.
+    """
+    leaked = {}
+    for d in sorted(mom["ds"]):
+        sel = _select(mom, d)
+        t, vn = sel["T"].mean(axis=0), sel["VN"].mean(axis=0)
+        _, a, _ = np.linalg.lstsq(np.column_stack([np.ones_like(t), t, t**2]), vn, rcond=None)[0]
+        leaked[d] = float(a * d)
+    chosen = next((d for d in sorted(leaked) if leaked[d] < tol), max(leaked))
+    return {"d": chosen, "leaked": leaked}
+
+
 def curvature_profile(mom: dict, d: int) -> list[dict]:
     """Scale profile: the estimate from each pair of consecutive k (slopes between two scales).
     Where the second-order expansion holds, it is flat in k."""
-    t2 = mom["T"].mean(axis=0) ** 2
-    m2, vn = mom["m2"].mean(axis=0), mom["VN"].mean(axis=0)
+    sel = _select(mom, d)
+    t2 = sel["T"].mean(axis=0) ** 2
+    m2, vn = sel["m2"].mean(axis=0), sel["VN"].mean(axis=0)
     out = []
     for i in range(len(t2) - 1):
         dt = t2[i + 1] - t2[i]
@@ -95,7 +138,7 @@ def curvature_profile(mom: dict, d: int) -> list[dict]:
         out.append(
             {
                 "k": [mom["k"][i], mom["k"][i + 1]],
-                "radius": float(np.sqrt(mom["T"].mean(axis=0)[i + 1] * (d + 2) / d)),
+                "radius": float(np.sqrt(sel["T"].mean(axis=0)[i + 1] * (d + 2) / d)),
                 "S_norm": s / (d * (d - 1)) if d > 1 else float("nan"),
                 "H_norm": float(np.sqrt(max(h2, 0)) / d),
                 "II2": ii2,
@@ -108,6 +151,7 @@ def curvature_from_moments(mom: dict, d: int, n_scales: int | None = None) -> di
     """Pooled estimate: centre-averaged moments per k, regressed on T^2 across the first
     `n_scales` values of k (all if None)."""
     sl = slice(0, n_scales)
+    mom = {**_select(mom, d), "k": mom["k"]}
     t2 = mom["T"].mean(axis=0)[sl] ** 2
     b, m2_0 = _slope(t2, mom["m2"].mean(axis=0)[sl])
     e, vn_0 = _slope(t2, mom["VN"].mean(axis=0)[sl])
