@@ -79,26 +79,39 @@ def diffusion_fit_transform(X, dmap):
     X_transform = dmap.fit_transform(X.cpu())
     return squareform(pdist(X_transform))
 
-def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95):
+def identity_cost_null(Cx, Cy, P=200):
+    n = Cx.shape[0]
+    base = (Cx**2).mean() + (Cy**2).mean()
+    obs = base - 2 * (Cx * Cy).mean()
+    null = torch.stack([
+        base - 2 * (Cx * Cy[p[:, None], p[None, :]]).mean()
+        for p in (torch.randperm(n, device=Cx.device) for _ in range(P))
+    ])
+    return obs, null
+
+def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="regular", n_permutations=200, quantile=0.95):
     if dist == "diffusion":
         # dmap = diffusion_map.DiffusionMap.from_sklearn(n_evecs=3, epsilon='bgh', alpha=0.5, k=64)
         # dist_metric = lambda x: diffusion(x, dmap)
         dist_metric = lambda x: diffusion(x)
     
-    # emb_x = dist_metric(X)
-    # emb_y = dist_metric(Y)
-
-    # C_x = torch.cdist(emb_x, emb_x)
 
     C_x = dist_metric(X)
     C_x /= C_x.mean()
 
-    # C_y = torch.cdist(emb_y, emb_y)
     C_y = dist_metric(Y)
     C_y /= C_y.mean()
 
-    T, log = ot.gromov.gromov_wasserstein(C_x, C_y, log=True)
-    gw_dist = log['gw_dist']
+    obs_gw, null_gw = identity_cost_null(C_x, C_y)
+
+    if gw_mode == 'regular':
+        T, log = ot.gromov.gromov_wasserstein(C_x, C_y, log=True)
+        gw_dist = log['gw_dist']
+    else:
+        assert gw_mode == 'entropic'
+        T = ot.gromov.entropic_gromov_wasserstein(C_x, C_y, log=True)
+        gw_dist = 0
+        
 
     true_score = torch.sum(T.diagonal())
 
@@ -107,14 +120,10 @@ def gromov_wasserstein(X, Y, dist="diffusion", n_permutations=200, quantile=0.95
     null_scores = T[perms, torch.arange(n, device=T.device)].sum(1)
 
     null_quantile = torch.quantile(null_scores, quantile)
-    # null_quantile = 1 / T.shape[0] + 1.645*torch.std(T)
     gated_score = max(0, true_score - null_quantile)
 
-    t2 = torch.sum(T**2)
-
-    # del emb_x, emb_y, C_x, C_y, T
     del C_x, C_y, T
-    return true_score, gated_score, gw_dist, t2
+    return true_score, gated_score, gw_dist, obs_gw, null_gw
     
 
 def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quantile=0.95):
@@ -130,7 +139,8 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
     true_score_ret = np.zeros((n_layers_x, n_layers_y))
     nc_score_ret = np.zeros((n_layers_x, n_layers_y))
     gw_dist_ret = np.zeros((n_layers_x, n_layers_y))
-    t2_sum_ret = np.zeros((n_layers_x, n_layers_y))
+    obs_gw_ret = np.zeros((n_layers_x, n_layers_y))
+    nc_gw_ret = np.zeros((n_layers_x, n_layers_y))
 
     pbar = tqdm(total=n_layers_x*n_layers_y)
 
@@ -144,18 +154,22 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
                 y_aligned = y
 
 
-            avg, nc, gw, t2 = gromov_wasserstein(x_aligned, y_aligned, n_permutations=num_permutations, quantile=quantile)
+            avg, nc, gw, obs_gw, nc_gw = gromov_wasserstein(
+                x_aligned, y_aligned, 
+                gw_mode='entropic',
+                n_permutations=num_permutations, quantile=quantile)
             true_score_ret[i, j] = avg
             nc_score_ret[i, j] = nc
             gw_dist_ret[i, j] = gw
-            t2_sum_ret[i, j] = t2
+            obs_gw_ret[i, j] = obs_gw
+            nc_gw_ret[i, j] = nc_gw
             pbar.update(1)
     return {
         "true_score": true_score_ret,
         "nc_score": nc_score_ret,
         "gw_dist": gw_dist_ret,
-        't2_sum': t2_sum_ret,
-
+        'obs_gw': obs_gw_ret,
+        'nc_gw': nc_gw_ret
     }
     
 def compute_alignment(x_fp, y_fp, num_permutations, quantile, normalize=True, precise=True):

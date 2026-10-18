@@ -11,7 +11,7 @@ VITLARGE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_large_patch14_dinov2.lvd14
 LLAMA3B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_3b/shard_0000.pt
 VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/shard_0000.pt
 
-OUT_PATH="/workspace/results/emily/gw_exploration_new"
+OUT_PATH="/workspace/results/emily/entropic_gw_results"
 
 python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH"
 python distance_metric_alignment.py --input_file_x "$LLAMA7B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH"
