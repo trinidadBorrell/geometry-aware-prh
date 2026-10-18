@@ -18,6 +18,21 @@ D-dimensional ambient space by a random isometry (orthonormal columns) and adds 
 - clusters: 10 Gaussian blobs N(c, I_d) with centres c ~ N(0, 1.5^2 I_d): flat pieces with
             sparse bridges, the case that local curvature estimators can mistake for negative
             curvature; no closed-form geodesic.
+
+High-codimension manifolds (exp-013): curved through many ambient directions, so their linear
+dimension (PCA90) is far above their ID, as in the LLM representations of exp-010.
+- torus_rff: a flat torus T^d wound through 2M dimensions by Fourier features,
+            x_j = a_j (cos <w_j, theta>, sin <w_j, theta>), theta uniform in [0, 2 pi)^d, w_j random
+            nonzero integer vectors, a_j ~ |w_j|^-alpha. Its metric sum_j a_j^2 w_j w_j^T is the
+            same at every point, so it is intrinsically flat (scalar curvature 0) while
+            extrinsically highly curved.
+- veronese: the unit sphere S^d mapped by z -> z z^T / sqrt(2) into symmetric matrices
+            ((d+1)(d+2)/2 coordinates). The map preserves the unit-sphere metric locally
+            (|d phi(v)| = |v| for v tangent), so the intrinsic curvature is that of S^d
+            (scalar curvature d(d-1)), with z and -z identified (the projective space RP^d);
+            geodesic arccos |<z, w>|.
+
+Every truth dict carries "scalar": the true scalar curvature (None if not constant / unknown).
 """
 
 from __future__ import annotations
@@ -35,7 +50,7 @@ def _euclid_geodesic(u: np.ndarray):
 
 def flat(n: int, d: int, rng) -> tuple[np.ndarray, dict]:
     z = rng.uniform(-1, 1, size=(n, d))
-    return z, {"id": d, "curvature": 0, "geodesic": _euclid_geodesic(z)}
+    return z, {"id": d, "curvature": 0, "scalar": 0.0, "geodesic": _euclid_geodesic(z)}
 
 
 def sphere(n: int, d: int, rng) -> tuple[np.ndarray, dict]:
@@ -45,7 +60,7 @@ def sphere(n: int, d: int, rng) -> tuple[np.ndarray, dict]:
     def geo(rows):
         return np.arccos(np.clip(z[rows] @ z.T, -1.0, 1.0))
 
-    return z, {"id": d, "curvature": 1, "geodesic": geo}
+    return z, {"id": d, "curvature": 1, "scalar": float(d * (d - 1)), "geodesic": geo}
 
 
 def _spiral_arc_length(t: np.ndarray) -> np.ndarray:
@@ -58,7 +73,7 @@ def swiss(n: int, d: int, rng) -> tuple[np.ndarray, dict]:
     rest = rng.uniform(0, 20, size=(n, d - 1))
     z = np.column_stack([t * np.cos(t), t * np.sin(t), rest])
     unrolled = np.column_stack([_spiral_arc_length(t), rest])
-    return z, {"id": d, "curvature": 0, "geodesic": _euclid_geodesic(unrolled)}
+    return z, {"id": d, "curvature": 0, "scalar": 0.0, "geodesic": _euclid_geodesic(unrolled)}
 
 
 def tree(n: int, d: int, rng, depth: int = 6, noise: float = 0.02) -> tuple[np.ndarray, dict]:
@@ -79,16 +94,47 @@ def tree(n: int, d: int, rng, depth: int = 6, noise: float = 0.02) -> tuple[np.n
     e = rng.choice(len(starts), n, p=lengths / lengths.sum())  # uniform along total length
     s = rng.uniform(0, 1, (n, 1))
     z = starts[e] + s * (ends[e] - starts[e]) + noise * rng.standard_normal((n, d))
-    return z, {"id": d, "curvature": -1, "geodesic": None}
+    return z, {"id": d, "curvature": -1, "scalar": None, "geodesic": None}
 
 
 def clusters(n: int, d: int, rng, n_clusters: int = 10, spread: float = 1.5):
     centres = spread * rng.standard_normal((n_clusters, d))
     z = centres[rng.integers(0, n_clusters, n)] + rng.standard_normal((n, d))
-    return z, {"id": d, "curvature": None, "geodesic": None}
+    return z, {"id": d, "curvature": None, "scalar": 0.0, "geodesic": None}
 
 
-MANIFOLDS = {"flat": flat, "sphere": sphere, "swiss": swiss, "tree": tree, "clusters": clusters}
+def torus_rff(n: int, d: int, rng, n_features: int = 256, alpha: float = 0.5, max_freq: int = 3):
+    theta = rng.uniform(0, 2 * np.pi, size=(n, d))
+    w = rng.integers(-max_freq, max_freq + 1, size=(n_features, d))
+    w = w[np.abs(w).sum(axis=1) > 0]
+    a = np.linalg.norm(w, axis=1) ** -alpha
+    phase = theta @ w.T
+    z = np.concatenate([a * np.cos(phase), a * np.sin(phase)], axis=1)
+    return z, {"id": d, "curvature": 0, "scalar": 0.0, "geodesic": None}
+
+
+def veronese(n: int, d: int, rng):
+    g = rng.standard_normal((n, d + 1))
+    u = g / np.linalg.norm(g, axis=1, keepdims=True)
+    iu = np.triu_indices(d + 1)
+    scale = np.where(iu[0] == iu[1], 1.0, np.sqrt(2.0)) / np.sqrt(2.0)  # Frobenius norm / sqrt 2
+    z = (u[:, iu[0]] * u[:, iu[1]]) * scale
+
+    def geo(rows):
+        return np.arccos(np.clip(np.abs(u[rows] @ u.T), 0.0, 1.0))
+
+    return z, {"id": d, "curvature": 1, "scalar": float(d * (d - 1)), "geodesic": geo}
+
+
+MANIFOLDS = {
+    "flat": flat,
+    "sphere": sphere,
+    "swiss": swiss,
+    "tree": tree,
+    "clusters": clusters,
+    "torus_rff": torus_rff,
+    "veronese": veronese,
+}
 
 
 def embed(z: np.ndarray, ambient: int, rng, noise_sd: float = 0.0) -> np.ndarray:
