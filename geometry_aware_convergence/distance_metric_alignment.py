@@ -88,10 +88,10 @@ def identity_cost_null(Cx, Cy, P=200):
         for p in (torch.randperm(n, device=Cx.device) for _ in range(P))
     ])
 
-    null_quantile = torch.quantile(null, 0.95)
-    return obs, max(0, obs - null_quantile)
+    null_quantile = torch.quantile(null, 0.05)
+    return obs, max(0, null_quantile - obs)
 
-def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="regular", n_permutations=200, quantile=0.95):
+def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="standard", n_permutations=200, quantile=0.95):
     if dist == "diffusion":
         # dmap = diffusion_map.DiffusionMap.from_sklearn(n_evecs=3, epsilon='bgh', alpha=0.5, k=64)
         # dist_metric = lambda x: diffusion(x, dmap)
@@ -106,12 +106,15 @@ def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="regular", n_permutations
 
     obs_gw, null_gw = identity_cost_null(C_x, C_y)
 
-    if gw_mode == 'regular':
+    if gw_mode == 'standard':
         T, log = ot.gromov.gromov_wasserstein(C_x, C_y, log=True)
         gw_dist = log['gw_dist']
-    else:
-        assert gw_mode == 'entropic'
+    elif gw_mode == 'entropic':
         T = ot.gromov.entropic_gromov_wasserstein(C_x, C_y, epsilon=0.3)
+        gw_dist = 0
+    else:
+        assert gw_mode == 'identity_cost_only'
+        T = torch.zeros((C_x.shape[0], C_x.shape[0]))
         gw_dist = 0
         
 
@@ -123,12 +126,21 @@ def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="regular", n_permutations
 
     null_quantile = torch.quantile(null_scores, quantile)
     gated_score = max(0, true_score - null_quantile)
+    T_sum = T.sum()
 
     del C_x, C_y, T
-    return true_score, gated_score, gw_dist, obs_gw, null_gw
+    return {
+        "true_score": true_score,
+        "gated_score": gated_score, 
+        "gw_dist": gw_dist, 
+        "obs_gw": obs_gw, 
+        "null_gw": null_gw,
+        "t_sum": T_sum
+    }
+
     
 
-def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quantile=0.95):
+def compute_score(x_feats, y_feats, gw_mode='standard', normalize=True, num_permutations=200, quantile=0.95):
     if isinstance(x_feats, torch.Tensor):
         x_feats = [x_feats[:, i, :] for i in range(x_feats.shape[1])]
 
@@ -138,11 +150,7 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
     n_layers_x = len(x_feats)
     n_layers_y = len(y_feats)
 
-    true_score_ret = np.zeros((n_layers_x, n_layers_y))
-    nc_score_ret = np.zeros((n_layers_x, n_layers_y))
-    gw_dist_ret = np.zeros((n_layers_x, n_layers_y))
-    obs_gw_ret = np.zeros((n_layers_x, n_layers_y))
-    nc_gw_ret = np.zeros((n_layers_x, n_layers_y))
+    ret = {}
 
     pbar = tqdm(total=n_layers_x*n_layers_y)
 
@@ -155,24 +163,17 @@ def compute_score(x_feats, y_feats, normalize=True, num_permutations=200, quanti
                 x_aligned = x
                 y_aligned = y
 
-
-            avg, nc, gw, obs_gw, nc_gw = gromov_wasserstein(
+            layer_pair_results = gromov_wasserstein(
                 x_aligned, y_aligned, 
-                gw_mode='entropic',
+                gw_mode=gw_mode,
                 n_permutations=num_permutations, quantile=quantile)
-            true_score_ret[i, j] = avg
-            nc_score_ret[i, j] = nc
-            gw_dist_ret[i, j] = gw
-            obs_gw_ret[i, j] = obs_gw
-            nc_gw_ret[i, j] = nc_gw
+
+            for res in layer_pair_results:
+                if res not in ret:
+                    ret[res] = np.zeros((n_layers_x, n_layers_y))
+                ret[res][i, j] = layer_pair_results[res]
             pbar.update(1)
-    return {
-        "true_score": true_score_ret,
-        "nc_score": nc_score_ret,
-        "gw_dist": gw_dist_ret,
-        'obs_gw': obs_gw_ret,
-        'nc_gw': nc_gw_ret
-    }
+    return ret
     
 def compute_alignment(x_fp, y_fp, num_permutations, quantile, normalize=True, precise=True):
     """
@@ -239,6 +240,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_dir",      type=str, default="/workspace/hf")
     parser.add_argument("--input_file_x",      type=str, default=None)
     parser.add_argument("--input_file_y",      type=str, default=None)
+    parser.add_argument("--gw_mode",      type=str, default='standard')
     parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/alignment")
     parser.add_argument("--precise",        action="store_true")
     parser.add_argument("--force_remake",   action="store_true")
@@ -260,7 +262,7 @@ if __name__ == "__main__":
     model_y_name = args.input_file_y.split('/')[-1][:-3]
     print('MODEL X', model_x_name, 'MODEL Y', model_y_name)
 
-    save_path = to_alignment_filename(args.output_dir, model_x_name, model_y_name, args.normalize)
+    save_path = to_alignment_filename(args.output_dir, model_x_name, model_y_name, args.gw_mode, args.normalize)
     
     if os.path.exists(save_path) and not args.force_remake:
         print(f"alignment already exists at {save_path}")
