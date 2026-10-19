@@ -175,7 +175,7 @@ def compute_score(x_feats, y_feats, gw_mode='standard', normalize=True, num_perm
             pbar.update(1)
     return ret
     
-def compute_alignment(x_fp, y_fp, num_permutations, quantile, normalize=True, precise=True):
+def compute_alignment(x_fp, y_fp, gw_mode, num_permutations, quantile, normalize=True, precise=True):
     """
     Args:
         x_fp: x features
@@ -208,7 +208,7 @@ def compute_alignment(x_fp, y_fp, num_permutations, quantile, normalize=True, pr
         y_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_y]
     
     alignment_scores = compute_score(
-        x_feats, y_feats, 
+        x_feats, y_feats, gw_mode=gw_mode,
         normalize=normalize,
         num_permutations=num_permutations,
         quantile=quantile
@@ -262,7 +262,7 @@ if __name__ == "__main__":
     model_y_name = args.input_file_y.split('/')[-1][:-3]
     print('MODEL X', model_x_name, 'MODEL Y', model_y_name)
 
-    save_path = to_alignment_filename(args.output_dir, model_x_name, model_y_name, args.gw_mode, args.normalize)
+    save_path = to_alignment_filename(args.output_dir, model_x_name, model_y_name, args.normalize)
     
     if os.path.exists(save_path) and not args.force_remake:
         print(f"alignment already exists at {save_path}")
@@ -275,6 +275,7 @@ if __name__ == "__main__":
     alignment = compute_alignment(
         args.input_file_x, 
         args.input_file_y, 
+        args.gw_mode,
         args.num_permutations,
         args.quantile, 
         args.normalize,
