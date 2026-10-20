@@ -133,8 +133,8 @@ density test separate curvature from other structure?
 - **Graph:** their `PersonaManifold.fit`: PCA to 99% of the variance; local metric
   g_i = sum_a v_a v_a^T / (lambda_a + 1e-4) on the top-d local PCA directions (whitening);
   edge weight (|delta|_{g_i} + |delta|_{g_j}) / 2; union-symmetrised kNN graph with k = 5d
-  (Table A.1); d = the true ID (capped at the retained PCA dimension, which only binds for the
-  thick tree at ID 20-40, where it is 15 and 22).
+  (Table A.1); d = the true ID (capped at the retained PCA dimension, which binds for the thick
+  tree at ID 20 and 40, where it is 15 and 25, and for the clusters at ID 40, 39).
 - **Curvature:** their `edge_curvature` convention for every edge: uniform measure on the graph
   neighbours, no mass on the node (idleness 0, their default), exact optimal transport with
   graph shortest-path costs. Computed with GraphRicciCurvature ("OTD", alpha 0, exp_power 0);
@@ -182,8 +182,8 @@ their Appendix E is only possible if the correlation was computed on far fewer p
 **3. Their density-decoupling test passes for differences that are not curvature.**
 (`fig6_pm_decoupling`, which redraws their Fig. E.1(b) on our scenarios):
 - *grouped* (both types intrinsically flat): Kruskal-Wallis p < 0.001 in 3/5 quintiles at ID 5
-  and **5/5 at ID 20 and 40**; spread points sit above grouped ones by 0.1-0.25 in every
-  quintile. The difference comes from the grouping: edges between members of a tight group are
+  and **5/5 at ID 20 and 40**; at ID 20 and 40 spread points sit above grouped ones by 0.08-0.26
+  in every quintile (at ID 5 the gap changes sign across quintiles). The difference comes from the grouping: edges between members of a tight group are
   very short, and kappa = 1 - W1 / d(x, y) divides by that short distance.
 - *mixture*: p < 0.001 in every quintile (4/4, 4/4, 5/5), with the type order tree > clusters >
   flat > sphere, the reverse of the true curvature (sphere +, flat 0, tree -).
