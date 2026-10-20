@@ -547,6 +547,7 @@ dependencies = [
     { name = "loguru" },
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "personamanifold" },
     { name = "pillow" },
     { name = "pot" },
     { name = "protobuf" },
@@ -595,6 +596,7 @@ requires-dist = [
     { name = "matplotlib" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "opencv-python", marker = "extra == 'video'", specifier = ">=4.5.0" },
+    { name = "personamanifold", git = "https://github.com/airaer1998/PersonaManifold?rev=33e181cb42220d2a0bc63c4c16260ed70c48fccb" },
     { name = "pillow" },
     { name = "pot", specifier = ">=0.9.7.post1" },
     { name = "protobuf" },
@@ -1429,6 +1431,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/30/4b/90c937815137d43ce71ba043cd3566221e9df6b9c805f24b5d138c9d40a7/parso-0.8.7.tar.gz", hash = "sha256:eaaac4c9fdd5e9e8852dc778d2d7405897ec510f2a298071453e5e3a07914bb1", size = 401824, upload-time = "2026-05-01T23:13:02.138Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/5d/8268b644392ee874ee82a635cd0df1773de230bde356c38de28e298392cc/parso-0.8.7-py2.py3-none-any.whl", hash = "sha256:a8926eb2a1b915486941fdbd31e86a4baf88fe8c210f25f2f35ecec5b574ca1c", size = 107025, upload-time = "2026-05-01T23:12:58.867Z" },
+]
+
+[[package]]
+name = "personamanifold"
+version = "0.1.0"
+source = { git = "https://github.com/airaer1998/PersonaManifold?rev=33e181cb42220d2a0bc63c4c16260ed70c48fccb#33e181cb42220d2a0bc63c4c16260ed70c48fccb" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
 ]
 
 [[package]]

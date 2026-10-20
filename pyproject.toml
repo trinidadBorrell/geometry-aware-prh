@@ -31,6 +31,7 @@ dependencies = [
     "scikit-dimension>=0.3.7",
     "graphriccicurvature>=0.5.3.1",
     "pot>=0.9.7.post1",
+    "personamanifold",
 ]
 
 [project.optional-dependencies]
@@ -66,6 +67,7 @@ calibrated-similarity = { workspace = true }
 torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
 torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
 torchaudio = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+personamanifold = { git = "https://github.com/airaer1998/PersonaManifold", rev = "33e181cb42220d2a0bc63c4c16260ed70c48fccb" }
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
