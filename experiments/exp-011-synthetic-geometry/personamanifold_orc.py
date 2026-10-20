@@ -22,7 +22,7 @@ Scenarios (n = 2000, embedded by a random isometry into 1024 dimensions, noise 0
 nearest-neighbour distance), at ID 5, 20 and 40:
 - suite: each exp-011 manifold alone (flat, sphere, swiss, tree, clusters); no types
 - mixture: four components, 500 points each, as types: flat (true curvature 0), sphere (+),
-  tree (hierarchical, -), clusters (flat pieces, 0); each in its own random subspace, translated
+  tree (hierarchical, -), clusters (flat pieces, 0); each scaled to unit RMS radius, in its own
   random subspace and 3 radii from the others, so the graph does not connect them
 - grouped: one flat cube [-1, 1]^d, all curvature 0; type "spread" = 1000 uniform points, type
   "grouped" = 100 tight groups of 10 (sd 0.02) at uniform positions. Grouped points have many
