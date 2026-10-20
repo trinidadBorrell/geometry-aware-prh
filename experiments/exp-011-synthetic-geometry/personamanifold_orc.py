@@ -53,10 +53,21 @@ NOISE = 0.1
 EPS = 1e-4  # their metric regularisation (Table A.1)
 
 
+def retained_pca_dim(x: np.ndarray, variance: float = 0.99) -> int:
+    """Their rule: components for `variance` of the energy (capped at the numerical rank)."""
+    s = np.linalg.svd(x - x.mean(axis=0), compute_uv=False)
+    rank = int(np.sum(s > s[0] * max(x.shape) * np.finfo(float).eps))
+    return min(int(np.searchsorted(np.cumsum(s**2) / np.sum(s**2), variance) + 1), rank)
+
+
 def their_graph(x: np.ndarray, d: int):
+    """Their fit refuses tangent_dim above the retained PCA dimension (it happens for the thick
+    tree, whose variance sits in few directions), so d is capped there; k stays 5 x the ID."""
     from personamanifold import PersonaManifold
 
-    return PersonaManifold(n_neighbors=5 * d, variance=0.99, tangent_dim=d, ridge=EPS).fit(x)
+    tangent = min(d, retained_pca_dim(x))
+    pm = PersonaManifold(n_neighbors=5 * d, variance=0.99, tangent_dim=tangent, ridge=EPS)
+    return pm.fit(x)
 
 
 def euclidean_twin(pm):
@@ -169,7 +180,7 @@ def run_one(scenario, d, manifold, threads, seed) -> dict:
     x, types, truth = make(scenario, d, rng, manifold)
     pm = their_graph(x, d)
     rec = {"scenario": scenario, "manifold": manifold, "d": d, "n": N, "k": 5 * d, "seed": seed}
-    rec.update(truth=truth, pca_dim=int(pm.points_.shape[1]))
+    rec.update(truth=truth, pca_dim=int(pm.points_.shape[1]), tangent_dim=int(pm.tangent_dim))
     for name, graph in (("whitened", pm.graph_), ("euclidean", euclidean_twin(pm))):
         orc = node_orc(graph, pm.neighbors_, threads)
         res = {"node": summary(orc["node"]), "edge": summary(orc["edge"])}
