@@ -1,6 +1,6 @@
 # exp-011: geometry estimators on synthetic manifolds (WP0)
 
-**Status:** stage 1 done · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-011-synthetic-geometry/`
+**Status:** stage 1 done, PersonaManifold replication done (addendum) · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-011-synthetic-geometry/`
 
 WP0 of the [proposal](../proposal-geometry-aware-prh.md). Stage 1 of WP0: the geometry
 estimators alone. Stage 2 (compatible vs incompatible *pairs*, scored by the WP3/WP5 alignment
@@ -107,3 +107,104 @@ of up to 500 points are too small relative to the curvature radius to show bendi
   (100k) or larger k fixes them on these synthetic sets before trusting them on models.
 - None of this measures pairs yet: stage 2 (compatible vs incompatible pairs) follows with the
   WP3 / WP5 measures.
+
+## Addendum: PersonaManifold's curvature pipeline and density-decoupling test
+
+**Status:** done · Run 2026-10-20, commit `b48b0b2`, RTX PRO 4500 pod (28 vCPU), ~25 min.
+Outputs in `/workspace/results/oddharak/exp-011-synthetic-geometry/personamanifold/`, copied to
+`results/exp-011-synthetic-geometry/personamanifold/` (`personamanifold_orc.jsonl`,
+`personamanifold_summary.txt`, `fig6_pm_decoupling`).
+
+### Question
+
+PersonaManifold (Xu et al. 2026, Section 3.2, Section 4.2, Appendix E) reports that node Ollivier-Ricci curvature
+of persona representations (ID d* ~ 15-23, n ~ 2k) is positive for professional personas
+("dense clusters", read as sphere-like) and negative for fictional ones ("isolated
+neighbourhoods", saddle-like), and that this is intrinsic geometry, not density, because the
+type differences persist within density quintiles (Kruskal-Wallis p < 0.001) and density barely
+correlates with curvature (Spearman rho = 0.08). Our Euclidean-graph ORC above (point 4) had the
+wrong sign at ID 20-40. Does their exact construction behave differently, and does their
+density test separate curvature from other structure?
+
+### Method
+
+`personamanifold_orc.py`, with their own package (`personamanifold`, pinned to commit
+`33e181c`, the code reviewed in full):
+- **Graph:** their `PersonaManifold.fit`: PCA to 99% of the variance; local metric
+  g_i = sum_a v_a v_a^T / (lambda_a + 1e-4) on the top-d local PCA directions (whitening);
+  edge weight (|delta|_{g_i} + |delta|_{g_j}) / 2; union-symmetrised kNN graph with k = 5d
+  (Table A.1); d = the true ID (capped at the retained PCA dimension, which only binds for the
+  thick tree at ID 20-40, where it is 15 and 22).
+- **Curvature:** their `edge_curvature` convention for every edge: uniform measure on the graph
+  neighbours, no mass on the node (idleness 0, their default), exact optimal transport with
+  graph shortest-path costs. Computed with GraphRicciCurvature ("OTD", alpha 0, exp_power 0);
+  `tests/test_personamanifold_orc.py` checks it equals their `edge_curvature` edge by edge (run on
+  the pod: passed). Node curvature = mean over the node's own k kNN edges (Section 3.2).
+- **Comparison:** the same union-kNN topology with plain Euclidean edge lengths.
+- **Their Appendix E test:** density = 1 / distance to the k-th neighbour (k = 5d; also k = 10)
+  in the PCA space; density quintiles; Kruskal-Wallis across types within each quintile;
+  Spearman(density, node curvature).
+- **Data:** n = 2000 (their scale), ID 5, 20, 40, random isometry into 1024 dimensions, noise 0.1
+  x the NN distance. Scenarios: each exp-011 manifold alone; a *mixture* of four components
+  (flat, sphere, tree, clusters; 500 points each, separate graph components) with the manifold
+  as "type"; *grouped*: one flat cube where half the points are uniform ("spread") and half
+  come in 100 tight groups of 10 ("grouped"), all intrinsically flat; *null*: a flat cube with
+  random labels.
+
+### Results
+
+**1. Their construction gives the same answers as the Euclidean graph.** Mean node ORC, whitened
+graph (Euclidean twin within 0.03-0.08 everywhere):
+
+| manifold (true curvature) | ID 5, k = 25 | ID 20, k = 100 | ID 40, k = 200 |
+|---|---|---|---|
+| flat (0) | -0.056 | +0.172 | +0.265 |
+| Swiss roll (0) | -0.076 | +0.175 | +0.263 |
+| sphere (+) | -0.145 | +0.100 | +0.230 |
+| thick tree (- at large scale) | +0.461 | +0.582 | +0.650 |
+| clusters (0 within pieces) | +0.031 | +0.602 | +0.867 |
+
+- The sign is set by k and the ID, not by the geometry: with k = 5d everything is negative at
+  ID 5 and positive at ID 20-40 (exp-011 point 4, with k = 10-30, was negative throughout).
+- The order is inverted relative to the truth at every ID: the sphere is always the *lowest*,
+  below flat space; the tree and the clusters are the *highest*. Whitening changes nothing that
+  matters.
+
+**2. Density and curvature are strongly coupled, not weakly.** On a single, uniformly sampled
+flat cube (the null scenario, no curvature anywhere) Spearman(density, node ORC) is -0.50 at ID 5
+and -0.95 at ID 20 and 40: ORC is almost a deterministic function of the sampling fluctuations of
+density. The sign of the coupling depends on the geometry (flat -0.95, sphere +0.32 or -0.31,
+clusters +0.30 or +0.48 at ID 20 / 40), so in a mixture of regions it can partly cancel, and a
+small overall rho (theirs: 0.08) does not show that curvature is independent of density.
+(Separately, with n ~ 2000, rho = 0.08 has p ~ 3e-4 and rho = 0.11 has p ~ 1e-6, so "n.s." in
+their Appendix E is only possible if the correlation was computed on far fewer points.)
+
+**3. Their density-decoupling test passes for differences that are not curvature.**
+(`fig6_pm_decoupling`, which redraws their Fig. E.1(b) on our scenarios):
+- *grouped* (both types intrinsically flat): Kruskal-Wallis p < 0.001 in 3/5 quintiles at ID 5
+  and **5/5 at ID 20 and 40**; spread points sit above grouped ones by 0.1-0.25 in every
+  quintile. The difference comes from the grouping: edges between members of a tight group are
+  very short, and kappa = 1 - W1 / d(x, y) divides by that short distance.
+- *mixture*: p < 0.001 in every quintile (4/4, 4/4, 5/5), with the type order tree > clusters >
+  flat > sphere, the reverse of the true curvature (sphere +, flat 0, tree -).
+- *null*: no quintile significant (p = 0.05-1) at any ID, so the test is not trivially
+  significant; it detects *some* structural difference between groups, but nothing in it ties
+  that difference to curvature.
+
+### What this means for the PersonaManifold claims
+
+- "Professional personas tend toward positive curvature; fictional characters exhibit negative
+  curvature" describes differences in node ORC that our synthetic data reproduces from grouping,
+  cluster structure and density alone, with the sign set by k and the ID. With their k = 5d and
+  d* ~ 20, flat data is already positive (+0.17), so positive values cannot be read as
+  sphere-like, nor negative ones as saddle-like.
+- Their density-matched test cannot certify that the heterogeneity is intrinsic geometry: it
+  passes on intrinsically flat data that differs only in grouping, and on a mixture whose
+  curvature order it reverses.
+- Their public code does not include the node-curvature, density or persona-scale pipeline, so
+  the paper's own numbers cannot be rerun; this addendum replicates the construction as specified
+  in Section 3.2, Table A.1 and the released `curvature.py`.
+- Their behavioural results (geodesic distances vs triplet consistency, steering quality) do not
+  depend on ORC meaning curvature and are not addressed here.
+- For this project: graph Ollivier-Ricci curvature is dropped (as in Gate A above); any curvature
+  claim about model representations needs controls of the kind used here.
