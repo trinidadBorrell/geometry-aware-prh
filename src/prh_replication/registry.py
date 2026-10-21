@@ -251,6 +251,27 @@ MODELS: dict[str, ModelSpec] = {
         panels=("A", "B"),
         notes="Separately identified language-supervised comparison.",
     ),
+    "siglip-base": ModelSpec(
+        key="siglip-base",
+        kind="vision",
+        source="timm",
+        checkpoint="vit_base_patch16_siglip_224.webli",
+        revision=None,
+        family="SigLIP",
+        release_date="2023-03",
+        release_source="https://arxiv.org/abs/2303.15343",
+        n_params=92_876_112,
+        hidden_size=768,
+        n_layers=12,
+        training_stage="language-supervised sigmoid contrastive (WebLI)",
+        objective="SigLIP",
+        modality="image",
+        language_supervised=True,
+        native_dtype="fp32/fp16",
+        access="public via timm",
+        panels=("replication",),
+        notes="Added for cca_reliability_replication_v1 new-vision panel.",
+    ),
 }
 
 DATASETS: dict[str, DatasetSpec] = {

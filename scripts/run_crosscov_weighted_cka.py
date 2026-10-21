@@ -1,0 +1,1 @@
+../experiments/caption_cca_reliability/scripts/run_crosscov_weighted_cka.py

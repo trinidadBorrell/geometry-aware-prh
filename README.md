@@ -40,10 +40,12 @@ Each later study has its own directory under `results/` on the work disk. Nothin
 | 21 Sep | Learned anisotropic weights. `diag(B)` on frozen training PCs, from repaired one-sided fits. | `results/learned_anisotropic_weights/` |
 | 22 Sep | Feature-selection frequency. Top 20% of original coordinates, and ΔM heatmaps. | `results/feature_selection_frequency/` |
 | 22 Sep | CKA versus version ordinal within a family. | `results/cka_vs_recency/` |
+| 13 Oct | CKA excess (raw − shuffle baseline) versus version ordinal on the combined 9-model language panel. | `results/cka_vs_recency_excess/` |
 | 23 Sep | RBF/RQ kernels rescored on an 80/20 holdout of the cached gallery. | `results/learned_kernel_cka_80_20/` |
 | 27 Sep | Metric stability: one-sided, shared-PC, separate, sample size, partner transfer. | `results/metric_stability/` |
 | 27–28 Sep | Full-gallery versus quarter-gallery training of the one-sided metric. | `results/resampled_metric_training/` |
 | 29 Sep–1 Oct | Structured factors: identity, one-sided, shared, separate, plus spectra and per-pair bars. | `results/structured_metric_factors/` |
+| Oct 2026 | Caption reliability → CCA + correlation weighting (filter, weighted CCA, mKNN, replication). Code: `experiments/caption_cca_reliability/`. | `results/caption_reliability_filter_v1/`, `results/crosscov_weighted_cka_v1/`, `results/cca_reliability_replication_v1/`, … |
 
 `scripts/plot_learned_anisotropic_weights.py` reads repaired `onesided_fits` and writes figures under `/mnt/sdb1/prh-replication-work/results/learned_anisotropic_weights/`. It does not refit, extract, or overwrite freeze artifacts.
 
@@ -63,6 +65,8 @@ Primary figures use fixed ρ=0.1 with vision and language partners separate. Wei
 ```
 
 `scripts/plot_cka_vs_recency.py` plots native test CKA against **approximate version ordinality of each pair** (mean of 1-based family ranks; VL uses the language rank only), not calendar dates.
+
+`scripts/plot_cka_vs_recency_excess.py` is the redo: **each OLMo → temporally nearest Qwen** (plus Qwen→nearest-OLMo anchors for ≥7 points), y-axis **excess CKA** (raw − analytic shuffle baseline). Headline: `temporal_match__excess_cka_vs_release_date.png`.
 
 ## Reproduction
 
@@ -119,6 +123,26 @@ Authorised comparison of full-gallery updates with quarter-gallery resampling fo
 ```bash
 export PYTHONPATH=/mnt/sdb1/prh-replication-work/repo/src
 /mnt/sdb1/prh-replication-work/venv/bin/python scripts/run_resampled_metric_training.py \
+  --work /mnt/sdb1/prh-replication-work --stage all
+```
+
+## Spectral transform calibration
+
+Compares a covariance-spectrum map with a correspondence-fitted ridge map and a matched q=32 exp(S) metric, then applies singular-value and eigenvalue powers. Compatible archived metrics are calibrated on a separate full-space track. Protocol: `configs/spectral_transform_calibration_protocol.md`. Output: `results/spectral_transform_calibration/`.
+
+```bash
+export PYTHONPATH=/mnt/sdb1/prh-replication-work/repo/src
+/mnt/sdb1/prh-replication-work/venv/bin/python scripts/run_spectral_transform_calibration.py \
+  --work /mnt/sdb1/prh-replication-work --stage all
+```
+
+## Unrestricted metric comparison
+
+Asks whether ridge beat the budgeted one-sided metric because of the distortion box or because the objectives differ. It reuses the frozen q=32 scores and the existing ridge and covariance maps. Protocol: `configs/unrestricted_metric_comparison_protocol.md`. Output: `results/unrestricted_metric_comparison/`.
+
+```bash
+export PYTHONPATH=/mnt/sdb1/prh-replication-work/repo/src
+/mnt/sdb1/prh-replication-work/venv/bin/python scripts/run_unrestricted_metric_comparison.py \
   --work /mnt/sdb1/prh-replication-work --stage all
 ```
 

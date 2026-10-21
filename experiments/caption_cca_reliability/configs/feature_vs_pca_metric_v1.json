@@ -1,0 +1,19 @@
+{
+  "name": "feature_vs_pca_metric_v1",
+  "label": "Feature vs PCA vs full CCA reliability metric (matched-subspace + ambient diagnostic)",
+  "evaluation_status": "exploratory_continuation_reused_test_cohort",
+  "parent_weighted_cka": "results/crosscov_weighted_cka_v1",
+  "parent_diagonal_ablation": "results/cca_metric_diagonal_ablation_v1",
+  "sae_checkpoint_dir": "results/sae_crosscov_v1/sae",
+  "languages": ["qwen2-7b", "olmo-7b-0724"],
+  "visions": ["dinov2-small", "vit-in21k-small"],
+  "sae_seed": 0,
+  "pca_d": 64,
+  "eta": 0.01,
+  "rho_floor": 1e-6,
+  "normalize_weights_by_mean": true,
+  "beta_fixed": 1.0,
+  "knn_k": 10,
+  "psd_atol_scale": 1e-8,
+  "output": "results/feature_vs_pca_metric_v1"
+}

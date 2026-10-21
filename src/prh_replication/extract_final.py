@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import hashlib
 from pathlib import Path
 import torch
 from tqdm import tqdm
@@ -150,6 +151,7 @@ def extract_language_final(
 
     handle = last.register_forward_hook(_hook)
     feats = []
+    token_lengths: list[int] = []
     with torch.no_grad():
         for start in tqdm(range(0, len(records), batch_size), desc=f"{spec.key}:{split}"):
             batch_texts = texts[start : start + batch_size]
@@ -159,6 +161,7 @@ def extract_language_final(
                 truncation=False,
                 return_tensors="pt",
             )
+            token_lengths.extend(int(value) for value in tokens["attention_mask"].sum(dim=1).tolist())
             tokens = {k: v.to(device) for k, v in tokens.items()}
             captured.clear()
             _ = model(input_ids=tokens["input_ids"], attention_mask=tokens.get("attention_mask"))
@@ -190,6 +193,11 @@ def extract_language_final(
         "layer_path": layer_path,
         "hidden_dim": int(all_feats.shape[1]),
         "model_class": type(model).__name__,
+        "tokenizer_class": type(tok).__name__,
+        "token_lengths": token_lengths,
+        "truncation": False,
+        "chat_template": False,
+        "tokenizer_model_max_length": _tokenizer_limit(tok),
     }
     save_features(out, payload)
     del model, tok
@@ -245,3 +253,140 @@ def load_final_prepared(paths: Paths, spec: ModelSpec, split: str, sample_ids: l
     else:
         x = feats
     return prh_prepare_layer(x), obj
+
+
+def _tokenizer_limit(tokenizer) -> int | None:
+    raw = getattr(tokenizer, "model_max_length", None)
+    try:
+        limit = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if limit <= 0 or limit > 10**9:
+        return None
+    return limit
+
+
+def _parameter_sha256(model) -> str:
+    digest = hashlib.sha256()
+    for parameter in model.parameters():
+        array = parameter.detach().float().cpu().contiguous().numpy()
+        digest.update(array.shape.__repr__().encode())
+        digest.update(array.tobytes())
+    return digest.hexdigest()
+
+
+def _mapping(value) -> dict:
+    if isinstance(value, dict):
+        return value
+    try:
+        return dict(value)
+    except Exception:
+        raw = getattr(value, "__dict__", None)
+        return raw if isinstance(raw, dict) else {}
+
+
+def _json_config(value):
+    if isinstance(value, dict):
+        return {str(key): _json_config(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_config(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def vision_last_cls(spec: ModelSpec, records: list[dict], batch_size: int = 32) -> tuple[torch.Tensor, dict]:
+    """Last ViT-block CLS, matching the archived all-layer hook without storing earlier blocks."""
+    import timm
+    from PIL import Image
+    from timm.data import resolve_data_config
+    from timm.data.transforms_factory import create_transform
+
+    from prh_replication.extract import _device_for
+
+    device = _device_for("vision", 300_000_000)
+    try:
+        model = timm.create_model(spec.checkpoint, pretrained=True).to(device).eval()
+    except Exception:
+        device = "cpu"
+        model = timm.create_model(spec.checkpoint, pretrained=True).to(device).eval()
+    data_config = resolve_data_config(model.pretrained_cfg, model=model)
+    transform = create_transform(**data_config)
+    last = model.blocks[-1]
+    captured: dict[str, torch.Tensor] = {}
+
+    def _hook(_module, _inputs, output):
+        captured["cls"] = output[:, 0, :].detach()
+
+    handle = last.register_forward_hook(_hook)
+    rows = []
+    with torch.no_grad():
+        for start in tqdm(range(0, len(records), batch_size), desc=spec.key):
+            batch = records[start : start + batch_size]
+            images = []
+            for record in batch:
+                with Image.open(record["abs_path"]) as image:
+                    images.append(transform(image.convert("RGB")))
+            _ = model(torch.stack(images).to(device))
+            if "cls" not in captured or captured["cls"].shape[0] != len(batch):
+                raise RuntimeError(f"last-block hook failed for {spec.key}")
+            rows.append(captured["cls"].float().cpu())
+            captured.clear()
+    handle.remove()
+    features = torch.cat(rows, dim=0)
+    if features.shape[0] != len(records) or not torch.isfinite(features).all():
+        raise ValueError(f"vision features invalid for {spec.key}")
+    pretrained = _mapping(getattr(model, "pretrained_cfg", {}) or {})
+    meta = {
+        "checkpoint": spec.checkpoint,
+        "parameter_sha256": _parameter_sha256(model),
+        "n_params": int(sum(parameter.numel() for parameter in model.parameters())),
+        "device": device,
+        "model_precision": "float32",
+        "feature_storage_precision": "float16",
+        "n_blocks": len(model.blocks),
+        "layer_name": f"blocks.{len(model.blocks) - 1}.output_cls",
+        "pretrained_cfg": _json_config(
+            {key: pretrained.get(key) for key in ("architecture", "tag", "file", "url", "hf_hub_id", "mean", "std", "input_size", "interpolation", "crop_pct")}
+        ),
+        "data_config": _json_config(
+            {key: data_config.get(key) for key in ("input_size", "interpolation", "mean", "std", "crop_pct")}
+        ),
+    }
+    del model
+    gc.collect()
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    return features, meta
+
+
+def extract_vision_final(
+    spec: ModelSpec,
+    records: list[dict],
+    paths: Paths,
+    dataset: str,
+    split: str,
+    batch_size: int = 32,
+) -> Path:
+    ids = [record["sample_id"] for record in records]
+    out = final_feature_path(paths, spec, dataset, split, ids)
+    if out.exists():
+        cached = load_features(out)
+        if list(cached["sample_ids"]) != ids:
+            raise ValueError(f"Cache ID mismatch {out}")
+        if cached.get("protocol") != PROTOCOL:
+            raise ValueError(f"Wrong protocol in cache {out}")
+        return out
+    features, meta = vision_last_cls(spec, records, batch_size=batch_size)
+    payload = {
+        "feats": features.unsqueeze(1).half().contiguous(),
+        "sample_ids": ids,
+        "layer_names": [meta["layer_name"]],
+        "hidden_state_note": "CLS token of the last ViT block output (post-residual). Final LN not applied. Earlier blocks are not stored.",
+        "protocol": PROTOCOL,
+        "checkpoint": spec.checkpoint,
+        "revision": spec.revision,
+        **meta,
+    }
+    save_features(out, payload)
+    return out
