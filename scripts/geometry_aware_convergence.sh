@@ -61,8 +61,7 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
     for v in "$@"; do
         for setting in "${SETTINGS[@]}"; do
             IFS='|' read -r x y out <<< "$setting"
-            align "$x" "$y" "$out" --metric "$metric" "$flag" "$v" --later-layers
-            align "$x" "$y" "$out" --metric "$metric" "$flag" "$v" --null-calibrate --later-layers
+            align "$x" "$y" "$out" --metric "$metric" "$flag" "$v"
         done
     done
 }
