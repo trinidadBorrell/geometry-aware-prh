@@ -44,11 +44,11 @@ VITLARGE=vit_large_patch14_dinov2.lvd142m
 
 # "x_file|y_file|output_dir" per dataset
 SETTINGS=(
-    # "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
-    # "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
-    # "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
-    # "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
-    "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/new_nc_large"
+    "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
+    "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
+    "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
+    "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
+    # "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/new_nc_large"
 )
 
 align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
@@ -66,7 +66,7 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
     done
 }
 
-sweep mutual_knn --topk 5 10 20 50 100
+# sweep mutual_knn --topk 5 10 20 50 100
 sweep mutual_nd --dist 0.995 0.99 0.98 0.95 0.9
 
 # sweep cknna_local --topk 5 10 20 50 100 200 500 1000
