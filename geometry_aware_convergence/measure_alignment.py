@@ -163,7 +163,7 @@ def compute_alignment(
                 x_model_name,
                 y_model_name,
                 metric,
-                topk, dist, null_calibration
+                topk, dist
             )
 
             np.save(save_path, {
@@ -190,9 +190,7 @@ def compute_alignment(
 
 
 
-def to_alignment_filename(output_dir, model_x, model_y, metric, topk, dist, null_calibrate):
-    if null_calibrate:
-        metric += "_NC"
+def to_alignment_filename(output_dir, model_x, model_y, metric, topk, dist):
     dist_flag = f'_d{dist}' if dist > 0 else ''
     save_path = os.path.join(
         output_dir,
@@ -238,11 +236,11 @@ if __name__ == "__main__":
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
     
-    save_path = to_alignment_filename(args.output_dir, args.metric, args.topk, args.dist, args.null_calibrate)
+    # save_path = to_alignment_filename(args.output_dir, args.metric, args.topk, args.dist)
     
-    if os.path.exists(save_path) and not args.force_remake:
-        print(f"alignment already exists at {save_path}")
-        exit()
+    # if os.path.exists(save_path) and not args.force_remake:
+    #     print(f"alignment already exists at {save_path}")
+    #     exit()
 
 
     if args.input_file_x is not None:
@@ -285,7 +283,7 @@ if __name__ == "__main__":
     pprint(models_y_paths)
     
     print('\nmeasuring alignment')
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    # os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     alignment_scores, alignment_indices = compute_alignment(
         models_x_paths, 
@@ -305,5 +303,5 @@ if __name__ == "__main__":
     #     "x_models": [m for m, _ in models_x],
     #     "y_models": [m for m, _ in models_y],
     # })
-    print(f"saved to {save_path}")
+    print(f"saved to {args.output_dir}")
     
