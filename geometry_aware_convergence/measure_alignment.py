@@ -8,7 +8,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
 import metrics
-from tasks import get_models
+from tasks import get_models, READABLE_NAMES
 from pprint import pprint
 
 from utils import *
@@ -16,7 +16,7 @@ from utils import *
 # Copied over from PRH directory.
 
 
-def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, normalize=True, null_calibration=False, num_permutations=200, quantile=0.95, later_layers = False):
+def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, normalize=True, null_calibration=True, num_permutations=200, quantile=0.95, later_layers = False):
     """
     Uses different layer combinations of x_feats and y_feats to find the best alignment
     Args:
@@ -69,11 +69,25 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
         else:
             x_aligned = x
             y_aligned = y
-        best_alignment_score = metrics.null_calibrate(metric, x_aligned, y_aligned, topk=topk, dist=dist, num_permutations=num_permutations, quantile=quantile)['gated']
-    return best_alignment_score, best_alignment_indices
+        null_scores = metrics.null_calibrate(metric, x_aligned, y_aligned, topk=topk, dist=dist, num_permutations=num_permutations, quantile=quantile)['null_scores']
+    else:
+        null_scores = []
+    return best_alignment_score, null_scores
 
     
-def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calibration, num_permutations, quantile,  later_layers, precise=True):
+def compute_alignment(
+        x_feat_paths, 
+        y_feat_paths, 
+        metric, 
+        topk, 
+        dist, 
+        num_permutations, 
+        quantile,  
+        later_layers, 
+        out_dir,
+        null_calibration=True, 
+        precise=True,
+    ):
     """
     Args:
         x_feat_paths: list of paths to x features
@@ -87,7 +101,15 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calib
         alignment_scores: a numpy array of shape len(x_feat_paths) x len(y_feat_paths)
         alignment_indices: a numpy array of shape len(x_feat_paths) x len(y_feat_paths) x 2
     """
-    
+
+    models =get_models('val', 'all')
+
+    def parse_fname(fname):
+        for model in models:
+            if model.replace('/', '_') in fname:
+                return READABLE_NAMES[model]
+        assert False, f"model name {fname} is not supported!"
+
     os.makedirs(args.output_dir, exist_ok=True)
 
     symmetric_metric = (sorted(x_feat_paths) == sorted(y_feat_paths))
@@ -98,6 +120,8 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calib
     alignment_indices = np.zeros((len(x_feat_paths), len(y_feat_paths), 2))
 
     pbar = tqdm(total=len(y_feat_paths) * len(x_feat_paths))
+
+    all_null = []
 
     for i, x_fp in enumerate(x_feat_paths):
         raw_x = torch.load(x_fp, map_location="cuda:0")["feats"]
@@ -119,7 +143,9 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calib
                 y_feats = prepare_features(raw_y.float(), exact=precise)
             else:
                 y_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_y]
-            best_score, best_indices = compute_score(
+
+            # alignment scores: per-layer alignment scores
+            alignment_scores, null_values = compute_score(
                 y_feats, x_feats,
                 metric=metric, topk=topk, dist=dist,
                 null_calibration=null_calibration, 
@@ -128,30 +154,49 @@ def compute_alignment(x_feat_paths, y_feat_paths, metric, topk, dist, null_calib
                 quantile=quantile,
                 later_layers = later_layers
             )
-            
-            alignment_scores[i, j] = best_score
-            alignment_indices[i, j] = best_indices
-            
-            if symmetric_metric:
-                alignment_scores[j, i] = best_score
-                alignment_indices[j, i] = best_indices[::-1]
 
+            x_model_name = parse_fname(x_fp)
+            y_model_name = parse_fname(y_fp)
+
+            save_path = to_alignment_filename(
+                out_dir,
+                x_model_name,
+                y_model_name,
+                metric,
+                topk, dist, null_calibration
+            )
+
+            np.save(save_path, {
+                    "scores": alignment_scores,
+                    "indices": alignment_indices,
+                    "x_models": [m for m, _ in models_x],
+                    "y_models": [m for m, _ in models_y],
+                })
+
+            all_null.append(null_values)
             pbar.update(1)
 
             del y_feats
             torch.cuda.empty_cache()
 
+
+    if null_calibration:
+        np.save(
+            os.path.join(out_dir, 'null_values.npy'), {
+                "values": np.stack(all_null).flatten()
+            }
+        )
     return alignment_scores, alignment_indices
 
 
 
-def to_alignment_filename(output_dir, metric, topk, dist, null_calibrate):
+def to_alignment_filename(output_dir, model_x, model_y, metric, topk, dist, null_calibrate):
     if null_calibrate:
         metric += "_NC"
     dist_flag = f'_d{dist}' if dist > 0 else ''
     save_path = os.path.join(
         output_dir,
-        f"{metric}_k{topk}{dist_flag}.npy" if ('knn' in metric or 'nd' in metric) else f"{metric}.npy"
+        f"{model_x}_{model_y}_{metric}_k{topk}{dist_flag}.npy" if ('knn' in metric or 'nd' in metric) else f"{metric}.npy"
     )
     return save_path
 
@@ -179,7 +224,7 @@ if __name__ == "__main__":
     parser.add_argument("--precise",        action="store_true")
     parser.add_argument("--force_remake",   action="store_true")
 
-    parser.add_argument("--null-calibrate", action="store_true")
+    # parser.add_argument("--null-calibrate", action="store_true")
     parser.add_argument("--num-permutations", type=int, default=200)
     parser.add_argument("--quantile", type=float, default=0.95)
 
@@ -240,14 +285,25 @@ if __name__ == "__main__":
     pprint(models_y_paths)
     
     print('\nmeasuring alignment')
-    alignment_scores, alignment_indices = compute_alignment(models_x_paths, models_y_paths, args.metric, args.topk, args.dist, args.null_calibrate, args.num_permutations, args.quantile, args.later_layers, args.precise)
-
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    np.save(save_path, {
-        "scores": alignment_scores,
-        "indices": alignment_indices,
-        "x_models": [m for m, _ in models_x],
-        "y_models": [m for m, _ in models_y],
-    })
+
+    alignment_scores, alignment_indices = compute_alignment(
+        models_x_paths, 
+        models_y_paths, 
+        args.metric, 
+        args.topk, 
+        args.dist,
+        args.num_permutations, 
+        args.quantile, 
+        args.later_layers, 
+        args.output_dir
+    )
+
+    # np.save(save_path, {
+    #     "scores": alignment_scores,
+    #     "indices": alignment_indices,
+    #     "x_models": [m for m, _ in models_x],
+    #     "y_models": [m for m, _ in models_y],
+    # })
     print(f"saved to {save_path}")
     

@@ -38,6 +38,43 @@ LVM_LAYER_COUNTS = {
     "vit_huge_patch14_clip_224.laion2b_ft_in12k": 32,
 }
 
+READABLE_NAMES = {
+    "bigscience/bloomz-560m": 'bloomz_560m',
+    "bigscience/bloomz-1b1": 'bloomz_1b1',
+    "bigscience/bloomz-1b7": 'bloomz_1b7',
+    "bigscience/bloomz-3b": 'bloomz_3b',
+    "bigscience/bloomz-7b1": 'bloomz_7b1',
+    "openlm-research/open_llama_3b": 'open_llama_3b',
+    "openlm-research/open_llama_7b": 'open_llama_7b',
+    "openlm-research/open_llama_13b": 'open_llama_13b',
+    "huggyllama/llama-7b": 'llama_7b',
+    "huggyllama/llama-13b": 'llama_13b',
+    "allenai/OLMo-1B-hf": 'olmo_1b',
+    "allenai/OLMo-7B-hf": 'olmo_7b',
+    "google/gemma-2b": 'gemma_2b',
+    "google/gemma-7b": 'gemma_7b',
+    "mistralai/Mistral-7B-v0.1": 'mistral_7b',
+    "mistralai/Mixtral-8x7B-v0.1": 'mixtral_8x7b',
+    "NousResearch/Meta-Llama-3-8B": 'llama3_8b',
+    "vit_tiny_patch16_224.augreg_in21k": 'vit_augreg_tiny',
+    "vit_small_patch16_224.augreg_in21k": 'vit_augreg_small',
+    "vit_base_patch16_224.augreg_in21k": 'vit_augreg_base',
+    "vit_large_patch16_224.augreg_in21k": 'vit_augreg_large',
+    "vit_base_patch16_224.mae": 'vit_mae_base',
+    "vit_large_patch16_224.mae": 'vit_mae_large',
+    "vit_huge_patch14_224.mae": 'vit_mae_huge',
+    "vit_small_patch14_dinov2.lvd142m": 'vit_dinov2_small',
+    "vit_base_patch14_dinov2.lvd142m": 'vit_dinov2_base',
+    "vit_large_patch14_dinov2.lvd142m": 'vit_dinov2_large',
+    "vit_giant_patch14_dinov2.lvd142m": 'vit_dinov2_giant',
+    "vit_base_patch16_clip_224.laion2b": 'vit_clip_base',
+    "vit_large_patch14_clip_224.laion2b": 'vit_clip_large',
+    "vit_huge_patch14_clip_224.laion2b": 'vit_clip_huge',
+    "vit_base_patch16_clip_224.laion2b_ft_in12k": 'vit_clip_ft_base',
+    "vit_large_patch14_clip_224.laion2b_ft_in12k": 'vit_clip_ft_large',
+    "vit_huge_patch14_clip_224.laion2b_ft_in12k": 'vit_clip_ft_huge',
+}
+
 
 def get_num_feature_layers(model_name, modality):
     if modality == "language":

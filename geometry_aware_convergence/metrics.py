@@ -97,8 +97,12 @@ class AlignmentMetrics:
         K_hat = K.clone().fill_diagonal_(float("-inf"))
         L_hat = L.clone().fill_diagonal_(float("-inf"))
 
-        mask_K = (K_hat >= cutoff).float()
-        mask_L = (L_hat >= cutoff).float()
+        # treat cutoff like a percentile.
+        cutoff_K = torch.quantile(K, cutoff)
+        cutoff_L =  torch.quantile(L, cutoff)
+
+        mask_K = (K_hat >= cutoff_K).float()
+        mask_L = (L_hat >= cutoff_L).float()
 
         inter = (mask_K * mask_L).sum(dim=1)
         total = (mask_K + mask_L).sum(dim=1)
