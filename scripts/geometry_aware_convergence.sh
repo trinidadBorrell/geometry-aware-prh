@@ -33,8 +33,8 @@ OUT_PATH="/workspace/results/emily/new_nc_metrics"
 
 FEATS=/workspace/hf
 # RESULTS=/workspace/results/emily
-# LLM=openlm-research_open_llama_3b
-# LVM=vit_base_patch14_dinov2.lvd142m
+LLM=openlm-research_open_llama_3b
+LVM=vit_base_patch14_dinov2.lvd142m
 
 LLAMA3B=openlm-research_open_llama_3b
 LLAMA7B=openlm-research_open_llama_7b
@@ -44,11 +44,11 @@ VITLARGE=vit_large_patch14_dinov2.lvd142m
 
 # "x_file|y_file|output_dir" per dataset
 SETTINGS=(
-    "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
-    "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
-    "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
-    "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
-    # "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/revision_1004/alignment_10k"
+    # "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
+    # "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
+    # "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
+    # "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
+    "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/new_nc_large"
 )
 
 align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
