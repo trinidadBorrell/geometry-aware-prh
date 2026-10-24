@@ -102,7 +102,8 @@ def compute_alignment(
         alignment_indices: a numpy array of shape len(x_feat_paths) x len(y_feat_paths) x 2
     """
 
-    models =get_models('val', 'all')
+    a, b =get_models('val', 'all')
+    models = a+b
 
     def parse_fname(fname):
         for model in models:
