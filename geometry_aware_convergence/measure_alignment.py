@@ -172,7 +172,7 @@ def compute_alignment(
 
             np.save(save_path, {
                     "scores": alignment_scores,
-                    # "indices": alignment_indices,
+                    "null_values": null_values,
                     "x_model": x_fp, 
                     "y_model": y_fp
                 })
@@ -184,12 +184,12 @@ def compute_alignment(
             torch.cuda.empty_cache()
 
 
-    if null_calibration:
-        np.save(
-            os.path.join(out_dir, f'{metric}_{topk}_{dist}_null_values.npy'), {
-                "values": np.stack(all_null).flatten()
-            }
-        )
+    # if null_calibration:
+    #     np.save(
+    #         os.path.join(out_dir, f'{metric}_{topk}_{dist}_null_values.npy'), {
+    #             "values": np.stack(all_null).flatten()
+    #         }
+    #     )
     return alignment_scores#, alignment_indices
 
 
