@@ -43,21 +43,8 @@ def diffusion_mem_efficient(X, n_evecs=3, k=64, alpha=0.5, t=1):
     return (evecs[:, 1:] / d[:, None]) * evals[1:] ** t
 
 def diffusion(X, n_evecs=3, k=64, alpha=0.5, t=1):
-    X = X.detach().double()
-    D = pairwise_sqdist(X)
-    sorted_vals = torch.sort(D, 1)[0]
-    eps = torch.median(sorted_vals[:, k]) ** 2
-    W = torch.exp(-D**2 / eps)
-    q = W.sum(1)
-    W = W / torch.outer(q**alpha, q**alpha)
-    d = W.sum(1)
-    S = W / torch.sqrt(torch.outer(d, d))
-    evals, evecs = torch.linalg.eigh(S)
-    idx = torch.argsort(-evals)[: n_evecs + 1]
-    evals, evecs = evals[idx], evecs[:, idx]
-    psi = evecs / torch.sqrt(d)[:, None]
-    emb = psi[:, 1:] * evals[1:] ** t
-    return pairwise_sqdist(emb)
+    emb = diffusion_mem_efficient(X, n_evecs, k, alpha, t)
+    return torch.cdist(emb, emb)
 
 def diffusion_cpu(X, n_evecs=3, k=64, alpha=0.5, t=1):
     X = X.detach().cpu().double().numpy()
@@ -91,12 +78,14 @@ def identity_cost_null(Cx, Cy, P=200):
     null_quantile = torch.quantile(null, 0.05)
     return obs, max(0, null_quantile - obs)
 
-def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="standard", n_permutations=200, quantile=0.95):
+def compress_T(T, tol=1e-12):
+    T = T.detach().cpu().numpy()
+    r, c = np.nonzero(T > tol)
+    return r.astype(np.int32), c.astype(np.int32), T[r, c].astype(np.float32)
+
+def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="standard", n_permutations=200, quantile=0.95, n_evecs=3):
     if dist == "diffusion":
-        # dmap = diffusion_map.DiffusionMap.from_sklearn(n_evecs=3, epsilon='bgh', alpha=0.5, k=64)
-        # dist_metric = lambda x: diffusion(x, dmap)
-        dist_metric = lambda x: diffusion(x)
-    
+        dist_metric = lambda x: diffusion(x, n_evecs = n_evecs)
 
     C_x = dist_metric(X)
     C_x /= C_x.mean()
@@ -111,36 +100,32 @@ def gromov_wasserstein(X, Y, dist="diffusion", gw_mode="standard", n_permutation
         gw_dist = log['gw_dist']
     elif gw_mode == 'entropic':
         T = ot.gromov.entropic_gromov_wasserstein(C_x, C_y, epsilon=0.3)
-        gw_dist = 0
+        gw_dist = float('nan')
     else:
         assert gw_mode == 'identity_cost_only'
-        T = torch.zeros((C_x.shape[0], C_x.shape[0]))
-        gw_dist = 0
+        T = None
+        gw_dist = float('nan')
         
 
-    true_score = torch.sum(T.diagonal())
+    # true_score = torch.sum(T.diagonal())
 
-    n = T.shape[0]
-    perms = torch.argsort(torch.rand(n_permutations, n, device=T.device), dim=1)
-    null_scores = T[perms, torch.arange(n, device=T.device)].sum(1)
+    # n = T.shape[0]
+    # perms = torch.argsort(torch.rand(n_permutations, n, device=T.device), dim=1)
+    # null_scores = T[perms, torch.arange(n, device=T.device)].sum(1)
 
-    null_quantile = torch.quantile(null_scores, quantile)
-    gated_score = max(0, true_score - null_quantile)
-    T_sum = T.sum()
+    # null_quantile = torch.quantile(null_scores, quantile)
+    # gated_score = max(0, true_score - null_quantile)
+    # T_sum = T.sum()
 
-    del C_x, C_y, T
-    return {
-        "true_score": true_score,
-        "gated_score": gated_score, 
-        "gw_dist": gw_dist, 
-        "obs_gw": obs_gw, 
-        "null_gw": null_gw,
-        "t_sum": T_sum
-    }
+    del C_x, C_y#, T
+    out = {"gw_dist": gw_dist, "obs_gw": obs_gw, "null_gw": null_gw}
+    if gw_mode != 'identity_cost_only':
+        out["T"] = T
+    return out
 
     
 
-def compute_score(x_feats, y_feats, gw_mode='standard', normalize=True, num_permutations=200, quantile=0.95):
+def compute_score(x_feats, y_feats, T_save_path=None, gw_mode='standard', normalize=True, num_permutations=200, quantile=0.95, n_evecs = 3):
     if isinstance(x_feats, torch.Tensor):
         x_feats = [x_feats[:, i, :] for i in range(x_feats.shape[1])]
 
@@ -151,6 +136,7 @@ def compute_score(x_feats, y_feats, gw_mode='standard', normalize=True, num_perm
     n_layers_y = len(y_feats)
 
     ret = {}
+    T_store = {}
 
     pbar = tqdm(total=n_layers_x*n_layers_y)
 
@@ -162,20 +148,29 @@ def compute_score(x_feats, y_feats, gw_mode='standard', normalize=True, num_perm
             else:
                 x_aligned = x
                 y_aligned = y
-
+            n = x_aligned.shape[0]
             layer_pair_results = gromov_wasserstein(
                 x_aligned, y_aligned, 
                 gw_mode=gw_mode,
-                n_permutations=num_permutations, quantile=quantile)
+                n_permutations=num_permutations, quantile=quantile, n_evecs=n_evecs)
 
-            for res in layer_pair_results:
+            for res, val in layer_pair_results.items():
+                if res == 'T':
+                    if gw_mode == 'entropic': 
+                        path = os.path.join(T_save_path, f"T_{i}_{j}.npy")
+                        np.save(path, val.detach().cpu().numpy().astype(np.float32))
+                        T_store[(i, j)] = path
+                    else: 
+                        T_store[(i, j)] = compress_T(val)
+                    continue
                 if res not in ret:
-                    ret[res] = np.zeros((n_layers_x, n_layers_y))
-                ret[res][i, j] = layer_pair_results[res]
+                    ret[res] = np.full((n_layers_x, n_layers_y), np.nan)
+                ret[res][i, j] = float(val)
             pbar.update(1)
+    ret['T'] = T_store
     return ret
     
-def compute_alignment(x_fp, y_fp, gw_mode, num_permutations, quantile, normalize=True, precise=True):
+def compute_alignment(x_fp, y_fp, T_save_path, gw_mode, num_permutations, quantile, normalize=True, n_evecs=3, precise=True):
     """
     Args:
         x_fp: x features
@@ -191,6 +186,9 @@ def compute_alignment(x_fp, y_fp, gw_mode, num_permutations, quantile, normalize
     """
     
     os.makedirs(args.output_dir, exist_ok=True)
+
+    if T_save_path is not None:
+        os.makedirs(T_save_path, exist_ok=True)
 
     raw_x = torch.load(x_fp, map_location="cuda:0")["feats"]
 
@@ -208,10 +206,10 @@ def compute_alignment(x_fp, y_fp, gw_mode, num_permutations, quantile, normalize
         y_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_y]
     
     alignment_scores = compute_score(
-        x_feats, y_feats, gw_mode=gw_mode,
-        normalize=normalize,
+        x_feats, y_feats, T_save_path=T_save_path,
+        gw_mode=gw_mode, normalize=normalize,
         num_permutations=num_permutations,
-        quantile=quantile
+        quantile=quantile, n_evecs=n_evecs
     )
 
     del x_feats, y_feats
@@ -221,11 +219,11 @@ def compute_alignment(x_fp, y_fp, gw_mode, num_permutations, quantile, normalize
 
 
 
-def to_alignment_filename(output_dir, model_x, model_y, normalize):
+def to_alignment_filename(output_dir, model_x, model_y, normalize, n_evecs, gw_mode):
     flag = 'norm' if normalize else 'raw'
     save_path = os.path.join(
         output_dir,
-        f"{model_x}_{model_y}_{flag}.npy"
+        f"{model_x}_{model_y}_mode_{gw_mode}_evec_{n_evecs}_{flag}.npy"
     )
     return save_path
 
@@ -247,6 +245,7 @@ if __name__ == "__main__":
     parser.add_argument("--normalize",   action="store_true")
 
     parser.add_argument("--num-permutations", type=int, default=200)
+    parser.add_argument("--n-evecs", type=int, default=3)
     parser.add_argument("--quantile", type=float, default=0.95)
 
     args = parser.parse_args()
@@ -262,7 +261,7 @@ if __name__ == "__main__":
     model_y_name = args.input_file_y.split('/')[-1][:-3]
     print('MODEL X', model_x_name, 'MODEL Y', model_y_name)
 
-    save_path = to_alignment_filename(args.output_dir, model_x_name, model_y_name, args.normalize)
+    save_path = to_alignment_filename(args.output_dir, model_x_name, model_y_name, args.normalize, args.n_evecs, args.gw_mode)
     
     if os.path.exists(save_path) and not args.force_remake:
         print(f"alignment already exists at {save_path}")
@@ -270,15 +269,19 @@ if __name__ == "__main__":
     
     
     print(f"dataset:\t{args.dataset}")
+
+    T_save_path = save_path[:-4]+'_T' if args.gw_mode == 'entropic' else None
     
     print('\nmeasuring alignment')
     alignment = compute_alignment(
         args.input_file_x, 
         args.input_file_y, 
+        T_save_path,
         args.gw_mode,
         args.num_permutations,
         args.quantile, 
         args.normalize,
+        args.n_evecs,
         args.precise
     )
     alignment["x_model"] = args.input_file_x
