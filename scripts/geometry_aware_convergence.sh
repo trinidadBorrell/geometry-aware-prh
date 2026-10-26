@@ -11,9 +11,10 @@ VITLARGE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_large_patch14_dinov2.lvd14
 LLAMA3B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_3b/shard_0000.pt
 VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/shard_0000.pt
 
-OUT_PATH="/workspace/results/emily/gw_debugged_1025"
+# OUT_PATH="/workspace/results/emily/gw_debugged_1025"
+OUT_PATH="/workspace/results/emily/nc_metrics_1025"
 
-python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH" --normalize --gw_mode "standard" --n-evecs 20
+# python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH" --normalize --gw_mode "standard" --n-evecs 20
 # python distance_metric_alignment.py --input_file_x "$LLAMA7B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH" --normalize --gw_mode "standard"
 
 # python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITLARGE_PATH" --output_dir "$OUT_PATH" --normalize  --gw_mode "standard"
@@ -31,43 +32,43 @@ python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_
 # python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH_BIG" --input_file_y "$VITBASE_PATH_BIG" --output_dir "$OUT_PATH" --normalize
 
 
-# FEATS=/workspace/hf
-# # RESULTS=/workspace/results/emily
-# LLM=openlm-research_open_llama_3b
-# LVM=vit_base_patch14_dinov2.lvd142m
+FEATS=/workspace/hf
+# RESULTS=/workspace/results/emily
+LLM=openlm-research_open_llama_3b
+LVM=vit_base_patch14_dinov2.lvd142m
 
-# LLAMA3B=openlm-research_open_llama_3b
-# LLAMA7B=openlm-research_open_llama_7b
+LLAMA3B=openlm-research_open_llama_3b
+LLAMA7B=openlm-research_open_llama_7b
 
-# VITBASE=vit_base_patch14_dinov2.lvd142m
-# VITLARGE=vit_large_patch14_dinov2.lvd142m
+VITBASE=vit_base_patch14_dinov2.lvd142m
+VITLARGE=vit_large_patch14_dinov2.lvd142m
 
-# # "x_file|y_file|output_dir" per dataset
-# SETTINGS=(
-#     "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
-#     "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
-#     "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
-#     "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
-#     # "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/new_nc_large"
-# )
+# "x_file|y_file|output_dir" per dataset
+SETTINGS=(
+    "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
+    "$FEATS/prh_llms/wit_1024/${LLAMA3B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
+    "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITBASE}_pool-cls.pt|$OUT_PATH"
+    "$FEATS/prh_llms/wit_1024/${LLAMA7B}_pool-avg.pt|$FEATS/prh_vlms/prh/wit_1024/${VITLARGE}_pool-cls.pt|$OUT_PATH"
+    # "$FEATS/wit_1m/shards/$LLM/shard_0000.pt|$FEATS/wit_1m/shards/$LVM/shard_0000.pt|$RESULTS/new_nc_large"
+)
 
-# align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
-#     local x=$1 y=$2 out=$3; shift 3
-#     python measure_alignment.py --input_file_x "$x" --input_file_y "$y" --output_dir "$out" "$@"
-# }
+align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
+    local x=$1 y=$2 out=$3; shift 3
+    python measure_alignment.py --input_file_x "$x" --input_file_y "$y" --output_dir "$out" "$@"
+}
 
-# sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datasets)
-#     local metric=$1 flag=$2; shift 2
-#     for v in "$@"; do
-#         for setting in "${SETTINGS[@]}"; do
-#             IFS='|' read -r x y out <<< "$setting"
-#             align "$x" "$y" "$out" --metric "$metric" "$flag" "$v"
-#         done
-#     done
-# }
+sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datasets)
+    local metric=$1 flag=$2; shift 2
+    for v in "$@"; do
+        for setting in "${SETTINGS[@]}"; do
+            IFS='|' read -r x y out <<< "$setting"
+            align "$x" "$y" "$out" --metric "$metric" "$flag" "$v"
+        done
+    done
+}
 
-# sweep mutual_knn --topk 5 10 20 50 100
-# sweep mutual_nd --dist 0.995 0.99 0.98 0.95 0.9
+sweep mutual_knn --topk 5 10 20 50 100
+sweep mutual_nd --dist 0.995 0.99 0.98 0.95 0.9
 
 # sweep cknna_local --topk 5 10 20 50 100 200 500 1000
 # sweep cknda_local --dist 0.99 0.98 0.97 0.96 0.95 0.94 0.93 0.92 0.91 0.9

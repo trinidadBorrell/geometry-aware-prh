@@ -183,7 +183,7 @@ def compute_alignment(
 
     if null_calibration:
         np.save(
-            os.path.join(out_dir, 'null_values.npy'), {
+            os.path.join(out_dir, f'{metric}_null_values.npy'), {
                 "values": np.stack(all_null).flatten()
             }
         )
