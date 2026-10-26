@@ -29,24 +29,27 @@ def compute_distances(feat_path, model, normalize=True, q=0.95, row_chunk=16, de
         del block
     q_val = torch.cat(row_qs).mean()
 
-    eye = torch.eye(n, dtype=torch.bool, device=device)
+    # eye = torch.eye(n, dtype=torch.bool, device=device)
 
-    KS = [1, 5, 10, 20, 50, 100] if '1024' in model else [10, 50, 100, 200, 500, 100]
-    k_idx = [n - 1 - k for k in KS]
+    # KS = [1, 5, 10, 20, 50, 100] if '1024' in model else [10, 50, 100, 200, 500, 100]
+    # k_idx = [n - 1 - k for k in KS]
 
     out = {}
     for l in range(num_layers):
-        x = feats[:, l, :].to(device).float().clamp(-q_val, q_val)
+        x = feats[:, l, :].to(device).float()#.clamp(-q_val, q_val)
         if normalize:
             x = F.normalize(x, p=2, dim=-1)
         K = x @ x.T
-        s = K[~eye].view(n, n - 1).sort(dim=1).values
+
+        mask_K = torch.triu(torch.ones_like(K, dtype=torch.bool), diagonal=1)
+        K_vals = K[mask_K]
+    
         del K, x
 
-        out[l] = s[:, k_idx]
+        out[l] = K_vals
 
     arrays = {k: v.cpu().numpy() for k, v in out.items()}
-    arrays['ks'] = KS
+    # arrays['ks'] = KS
     np.save(save_path, arrays)
 
 if __name__ == "__main__":
@@ -62,7 +65,7 @@ if __name__ == "__main__":
     parser.add_argument("--modality",      type=str, default="language")
     parser.add_argument("--model_name",      type=str)
     
-    parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/manifold_dists")
+    parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/manifold_dists_pairwise")
     
 
     args = parser.parse_args()
