@@ -67,7 +67,7 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
     done
 }
 
-sweep mutual_knn --topk 5 10 20 50 100
+# sweep mutual_knn --topk 5 10 20 50 100
 sweep mutual_nd --dist 0.995 0.99 0.98 0.95 0.9
 
 # sweep cknna_local --topk 5 10 20 50 100 200 500 1000

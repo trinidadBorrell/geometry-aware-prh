@@ -105,7 +105,7 @@ class AlignmentMetrics:
         L_vals = L[mask_L]
 
         cutoff_K = torch.quantile(K_vals, cutoff)
-        cutoff_L =  torch.quantile(L_vals)
+        cutoff_L =  torch.quantile(L_vals, cutoff)
 
         mask_K = (K_hat >= cutoff_K).float()
         mask_L = (L_hat >= cutoff_L).float()
@@ -672,7 +672,7 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
                 L_vals = L[mask_L]
 
                 cutoff_K = torch.quantile(K_vals, dist)
-                cutoff_L =  torch.quantile(L_vals)
+                cutoff_L =  torch.quantile(L_vals, dist)
 
                 mask_K = (K_hat >= cutoff_K).float()
                 mask_L = (L_hat >= cutoff_L).float()
