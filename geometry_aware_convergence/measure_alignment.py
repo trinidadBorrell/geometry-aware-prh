@@ -35,6 +35,8 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
     best_alignment_indices = None
     best_alignment_score = None
 
+    alignment_scores =  np.zeros((len(x_feats), len(y_feats)))
+
     for i, x in enumerate(x_feats):
         for j, y in enumerate(y_feats):
             # if using later layers only, restrict to relative depth > 0.5
