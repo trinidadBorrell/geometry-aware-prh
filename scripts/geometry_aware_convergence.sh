@@ -12,7 +12,7 @@ LLAMA3B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_3b/shard
 VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/shard_0000.pt
 
 # OUT_PATH="/workspace/results/emily/gw_debugged_1025"
-OUT_PATH="/workspace/results/emily/nc_metrics_1025"
+OUT_PATH="/workspace/results/emily/nc_metrics_1025_debug"
 
 # python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH" --normalize --gw_mode "standard" --n-evecs 20
 # python distance_metric_alignment.py --input_file_x "$LLAMA7B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH" --normalize --gw_mode "standard"
@@ -67,7 +67,7 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
     done
 }
 
-# sweep mutual_knn --topk 5 10 20 50 100
+sweep mutual_knn --topk 5 10 20 50 100
 sweep mutual_nd --dist 0.995 0.99 0.98 0.95 0.9
 
 # sweep cknna_local --topk 5 10 20 50 100 200 500 1000

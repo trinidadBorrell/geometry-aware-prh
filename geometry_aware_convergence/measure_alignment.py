@@ -55,6 +55,7 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
                 kwargs['cutoff'] = dist
 
             score = metrics.AlignmentMetrics.measure(metric, x_aligned, y_aligned, **kwargs)
+            alignment_scores[i, j] = score
 
             if best_alignment_score is None or score > best_alignment_score:
                 best_alignment_score = score
@@ -72,7 +73,7 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
         null_scores = metrics.null_calibrate(metric, x_aligned, y_aligned, topk=topk, dist=dist, num_permutations=num_permutations, quantile=quantile)['null_scores']
     else:
         null_scores = []
-    return best_alignment_score, null_scores
+    return alignment_scores, null_scores
 
     
 def compute_alignment(
@@ -117,8 +118,8 @@ def compute_alignment(
     if metric == "cycle_knn":
         symmetric_metric = False
 
-    alignment_scores = np.zeros((len(x_feat_paths), len(y_feat_paths)))
-    alignment_indices = np.zeros((len(x_feat_paths), len(y_feat_paths), 2))
+    # alignment_scores = np.zeros((len(x_feat_paths), len(y_feat_paths)))
+    # alignment_indices = np.zeros((len(x_feat_paths), len(y_feat_paths), 2))
 
     pbar = tqdm(total=len(y_feat_paths) * len(x_feat_paths))
 
@@ -169,9 +170,9 @@ def compute_alignment(
 
             np.save(save_path, {
                     "scores": alignment_scores,
-                    "indices": alignment_indices,
-                    "x_models": [m for m, _ in models_x],
-                    "y_models": [m for m, _ in models_y],
+                    # "indices": alignment_indices,
+                    "x_model": x_fp, 
+                    "y_model": y_fp
                 })
 
             all_null.append(null_values)
