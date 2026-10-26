@@ -190,7 +190,7 @@ def compute_alignment(
                 "values": np.stack(all_null).flatten()
             }
         )
-    return alignment_scores, alignment_indices
+    return alignment_scores#, alignment_indices
 
 
 
@@ -289,7 +289,7 @@ if __name__ == "__main__":
     print('\nmeasuring alignment')
     # os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    alignment_scores, alignment_indices = compute_alignment(
+    compute_alignment(
         models_x_paths, 
         models_y_paths, 
         args.metric, 
