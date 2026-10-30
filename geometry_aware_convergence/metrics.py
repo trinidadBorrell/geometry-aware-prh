@@ -403,14 +403,14 @@ class AlignmentMetrics:
 
 
     @staticmethod
-    def mutual_knn_all_k(feats_A, feats_B, chunk=1024):
+    def mutual_knn_all_k(feats_A, feats_B, chunk=512):
         """
         mutual-kNN score for every k = 1..N-1 in one pass.
-        Returns a length N-1 tensor; entry k-1 equals AlignmentMetrics.mutual_knn(feats_A, feats_B, topk=k).
+        Returns a length N tensor; entry k-1 equals AlignmentMetrics.mutual_knn(feats_A, feats_B, topk=k).
         """
         n = feats_A.shape[0]
         device = feats_A.device
-        total = torch.zeros(n, dtype=torch.float64, device=device)   # index = k (0 unused)
+        total = torch.zeros(n + 1, dtype=torch.float64, device=device)   # index = k (0 unused)
         ones = torch.ones(1, dtype=torch.int32, device=device)
     
         def ranks(feats, rows):
@@ -431,7 +431,7 @@ class AlignmentMetrics:
             total += overlap.sum(dim=0).to(torch.float64)
     
         k = torch.arange(1, n, device=device, dtype=torch.float64)
-        return (total[1:n] / (n * k)).float()
+        return (total[1:] / (n * k)).float()
 
 
 
