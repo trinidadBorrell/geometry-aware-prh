@@ -431,7 +431,7 @@ class AlignmentMetrics:
             total += overlap.sum(dim=0).to(torch.float64)
     
         k = torch.arange(1, n, device=device, dtype=torch.float64)
-        return (total[1:] / (n * k)).float()
+        return (total[1:n] / (n * k)).float()
 
 
 
@@ -532,21 +532,55 @@ def compute_distance(X, Y, dist_fn):
     return torch.tensor(distances)
 
 
-def remove_outliers(feats, q, exact=False, max_threshold=None):
+import torch
+
+
+def _exact_abs_quantile(feats, q, chunk_elems=1 << 24):
+    flat = feats.view(-1)
+    numel = flat.numel()
+    idx = int(q * numel)
+    dev = flat.device
+
+    def keys_of(s):
+        return flat[s:s + chunk_elems].abs().float().view(torch.int32)
+
+    hist_hi = torch.zeros(1 << 16, dtype=torch.int64, device=dev)
+    for s in range(0, numel, chunk_elems):
+        hist_hi += torch.bincount(keys_of(s) >> 16, minlength=1 << 16)
+    cum = hist_hi.cumsum(0)
+    hi = int((cum < idx + 1).sum())
+    below = int(cum[hi - 1]) if hi > 0 else 0
+
+    hist_lo = torch.zeros(1 << 16, dtype=torch.int64, device=dev)
+    for s in range(0, numel, chunk_elems):
+        k = keys_of(s)
+        hist_lo += torch.bincount(k[(k >> 16) == hi] & 0xFFFF, minlength=1 << 16)
+    lo = int((hist_lo.cumsum(0) < (idx - below + 1)).sum())
+
+    key = torch.tensor([(hi << 16) | lo], dtype=torch.int32, device=dev)
+    return key.view(torch.float32)[0].to(feats.dtype)
+
+
+def remove_outliers(feats, q, exact=False, max_threshold=None, inplace=False):
     if q == 1:
         return feats
 
     if exact:
-        # sorts the whole tensor and gets the q-th percentile
-        q_val = feats.view(-1).abs().sort().values[int(q * feats.numel())]
+        try:
+            q_val = feats.view(-1).abs().sort().values[int(q * feats.numel())]
+        except torch.OutOfMemoryError:
+            q_val = _exact_abs_quantile(feats, q)
     else:
-        # quantile for element in the tensor and take the average
-        q_val = torch.quantile(feats.abs().flatten(start_dim=1), q, dim=1).mean()
+        flat2d = feats.reshape(feats.shape[0], -1)
+        rows = max(1, (1 << 23) // flat2d.shape[1])
+        q_val = torch.cat([
+            torch.quantile(flat2d[s:s + rows].abs(), q, dim=1) for s in range(0, flat2d.shape[0], rows)
+        ]).mean()
 
     if max_threshold is not None:
         max_threshold = max(max_threshold, q_val)
 
-    return feats.clamp(-q_val, q_val)
+    return feats.clamp_(-q_val, q_val) if inplace else feats.clamp(-q_val, q_val)
 
 
 KERNEL_METRICS = {"cka", "unbiased_cka", "cknna", "mutual_knn", "cknda"}
