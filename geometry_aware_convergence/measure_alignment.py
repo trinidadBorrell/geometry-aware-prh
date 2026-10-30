@@ -16,15 +16,17 @@ from utils import *
 # Copied over from PRH directory.
 
 
-def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, normalize=True, null_calibration=True, num_permutations=200, quantile=0.95, later_layers = False):
+def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, normalize=True, null_calibration=True, num_permutations=200, quantile=0.95, later_layers=False, seed=0):
     """
-    Uses different layer combinations of x_feats and y_feats to find the best alignment
+    Scores every (x layer, y layer) cell, then null-calibrates ALL cells.
     Args:
-        x_feats: a torch tensor of shape N x L x D
-        y_feats: a torch tensor of shape N x L x D
+        x_feats, y_feats: tensors of shape N x L x D, or lists of N x D tensors (one per layer)
     Returns:
-        best_alignment_score: the best alignment score
-        best_alignment: the indices of the best alignment
+        alignment_scores: (Lx, Ly) for scalar metrics, (Lx, Ly, *score_shape) for vector metrics
+                          (e.g. (Lx, Ly, N-1) for mutual_knn_all_k). Skipped cells are NaN.
+        null_max: per cell, the maximum null score over all permutations (per k for vector metrics).
+                  Same shape as alignment_scores; skipped cells are NaN. None if null_calibration is False.
+                  Only this max is kept; the full (P, cells, ...) null is never stored.
     """
     if isinstance(x_feats, torch.Tensor):
         x_feats = [x_feats[:, i, :] for i in range(x_feats.shape[1])]
@@ -32,52 +34,50 @@ def compute_score(x_feats, y_feats, metric="mutual_knn", topk=10, dist=None, nor
     if isinstance(y_feats, torch.Tensor):
         y_feats = [y_feats[:, j, :] for j in range(y_feats.shape[1])]
 
-    best_alignment_indices = None
-    best_alignment_score = None
+    def prep(f):
+        return F.normalize(f, p=2, dim=-1) if normalize else f
 
-    alignment_scores =  np.zeros((len(x_feats), len(y_feats)))
+    def skip(i, j):
+        # if using later layers only, restrict to relative depth > 0.5
+        return later_layers and (i <= len(x_feats) // 2 or j <= len(y_feats) // 2)
 
-    for i, x in enumerate(x_feats):
-        for j, y in enumerate(y_feats):
-            # if using later layers only, restrict to relative depth > 0.5
-            if later_layers and i <= len(x_feats) // 2 or j <= len(y_feats) // 2:
-                continue
-            if normalize:
-                x_aligned = F.normalize(x, p=2, dim=-1)
-                y_aligned = F.normalize(y, p=2, dim=-1)
-            else:
-                x_aligned = x
-                y_aligned = y
+    cells = [(i, j) for i in range(len(x_feats)) for j in range(len(y_feats)) if not skip(i, j)]
+    assert len(cells) > 0, "no layer pairs to evaluate"
 
-            kwargs = {}
-            if 'knn' in metric:
-                kwargs['topk'] = topk
-            if 'nd' in metric:
-                assert dist is not None, 'dist must be defined'
-                kwargs['cutoff'] = dist
+    kwargs = {}
+    if 'knn' in metric and 'all_k' not in metric:
+        kwargs['topk'] = topk
+    if 'nd' in metric:
+        assert dist is not None, 'dist must be defined'
+        kwargs['cutoff'] = dist
 
-            score = metrics.AlignmentMetrics.measure(metric, x_aligned, y_aligned, **kwargs)
-            alignment_scores[i, j] = score
+    # ---- true scores for every cell ----
+    alignment_scores = None
+    for i, j in cells:
+        score = metrics.AlignmentMetrics.measure(metric, prep(x_feats[i]), prep(y_feats[j]), **kwargs)
+        score = score.detach().cpu().numpy() if isinstance(score, torch.Tensor) else np.asarray(score)
+        if alignment_scores is None:
+            alignment_scores = np.full((len(x_feats), len(y_feats)) + score.shape, np.nan)
+        alignment_scores[i, j] = score
 
-            if best_alignment_score is None or score > best_alignment_score:
-                best_alignment_score = score
-                best_alignment_indices = (i, j)
+    # ---- null for ALL cells: per cell, keep only the max over permutations ----
+    null_max = None
     if null_calibration:
-        i, j = best_alignment_indices
-        x, y = x_feats[i], y_feats[j]
+        null_max = np.full(alignment_scores.shape, np.nan)
+        n = x_feats[0].shape[0]
+        g = torch.Generator().manual_seed(seed)
+        perms = torch.stack([torch.randperm(n, generator=g) for _ in range(num_permutations)])
+        for i, j in tqdm(cells, desc="null", leave=False):
+            null_cell = metrics.null_calibrate(
+                metric, prep(x_feats[i]), prep(y_feats[j]),
+                topk=topk, dist=dist, num_permutations=num_permutations,
+                quantile=quantile, perms=perms,
+            )['null_scores']                     # (P,) or (P, N-1)
+            null_max[i, j] = np.max(null_cell, axis=0)   # max over permutations -> () or (N-1,)
 
-        if normalize:
-            x_aligned = F.normalize(x, p=2, dim=-1)
-            y_aligned = F.normalize(y, p=2, dim=-1)
-        else:
-            x_aligned = x
-            y_aligned = y
-        null_scores = metrics.null_calibrate(metric, x_aligned, y_aligned, topk=topk, dist=dist, num_permutations=num_permutations, quantile=quantile)['null_scores']
-    else:
-        null_scores = []
-    return alignment_scores, null_scores
+    return alignment_scores, null_max
 
-    
+
 def compute_alignment(
         x_feat_paths, 
         y_feat_paths, 
@@ -149,7 +149,7 @@ def compute_alignment(
                 y_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_y]
 
             # alignment scores: per-layer alignment scores
-            alignment_scores, null_values = compute_score(
+            alignment_scores, null_max = compute_score(
                 y_feats, x_feats,
                 metric=metric, topk=topk, dist=dist,
                 null_calibration=null_calibration, 
@@ -172,12 +172,14 @@ def compute_alignment(
 
             np.save(save_path, {
                     "scores": alignment_scores,
-                    "null_values": null_values,
-                    "x_model": x_fp, 
+                    # per cell: max null score over all permutations (per k for vector metrics).
+                    # same shape as "scores"; None if no calibration.
+                    "null_max": null_max,
+                    "x_model": x_fp,
                     "y_model": y_fp
                 })
 
-            all_null.append(null_values)
+            all_null.append(null_max)
             pbar.update(1)
 
             del y_feats
@@ -308,4 +310,3 @@ if __name__ == "__main__":
     #     "y_models": [m for m, _ in models_y],
     # })
     print(f"saved to {args.output_dir}")
-    

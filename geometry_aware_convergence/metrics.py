@@ -20,6 +20,7 @@ class AlignmentMetrics:
     SUPPORTED_METRICS = [
         "cycle_knn",
         "mutual_knn",
+        "mutual_knn_all_k",
         "mutual_nd",
         "lcs_knn",
         "cka",
@@ -401,6 +402,39 @@ class AlignmentMetrics:
         return sim_kl.item() / (torch.sqrt(sim_kk * sim_ll) + 1e-6).item()
 
 
+    @staticmethod
+    def mutual_knn_all_k(feats_A, feats_B, chunk=1024):
+        """
+        mutual-kNN score for every k = 1..N-1 in one pass.
+        Returns a length N-1 tensor; entry k-1 equals AlignmentMetrics.mutual_knn(feats_A, feats_B, topk=k).
+        """
+        n = feats_A.shape[0]
+        device = feats_A.device
+        total = torch.zeros(n, dtype=torch.float64, device=device)   # index = k (0 unused)
+        ones = torch.ones(1, dtype=torch.int32, device=device)
+    
+        def ranks(feats, rows):
+            sim = feats[rows] @ feats.T 
+            b = rows.shape[0]
+            sim[torch.arange(b, device=device), rows] = float("-inf")
+            order = sim.argsort(dim=1, descending=True, stable=True)
+            r = torch.empty_like(order)
+            r.scatter_(1, order, torch.arange(1, n + 1, device=device).expand(b, n).contiguous())
+            return r
+    
+        for s in range(0, n, chunk):
+            rows = torch.arange(s, min(s + chunk, n), device=device)
+            m = torch.maximum(ranks(feats_A, rows), ranks(feats_B, rows))
+            counts = torch.zeros(rows.shape[0], n + 1, dtype=torch.int32, device=device)
+            counts.scatter_add_(1, m, ones.expand_as(m).contiguous())
+            overlap = counts.cumsum(dim=1)
+            total += overlap.sum(dim=0).to(torch.float64)
+    
+        k = torch.arange(1, n, device=device, dtype=torch.float64)
+        return (total[1:n] / (n * k)).float()
+
+
+
 def hsic_unbiased(K, L):
     """
     Compute the unbiased Hilbert-Schmidt Independence Criterion (HSIC) as per Equation 5 in the paper.
@@ -515,43 +549,13 @@ def remove_outliers(feats, q, exact=False, max_threshold=None):
     return feats.clamp(-q_val, q_val)
 
 
-
-if __name__ == "__main__":
-    import torch.nn.functional as F
-    torch.manual_seed(0)
-    feats_A = torch.randn(64, 8192)
-    feats_B = torch.randn(64, 8192)
-    feats_A = F.normalize(feats_A, dim=-1)
-    feats_B = F.normalize(feats_B, dim=-1)
-
-    import time 
-    trials = 10
-
-    t0 = time.time()
-    for metric in AlignmentMetrics.SUPPORTED_METRICS:
-
-        scores, times = [], []
-        for t in range(trials):
-            t_st = time.time()
-
-            kwargs = {}
-            if 'nn' in metric:
-                kwargs['topk'] = 10
-            if 'cca' in metric:
-                kwargs['cca_dim'] = 10
-            if 'kernel' in metric:
-                kwargs['dist'] = 'sample'
-
-            score = AlignmentMetrics.measure(metric, feats_A, feats_B, **kwargs)
-            scores.append(score)
-            times.append(time.time() - t_st)        
-        print(f"{metric.rjust(20)}: {np.mean(scores):1.3f} [elapsed: {np.mean(times):.2f}s]")
-
-    print(f'Total time: {time.time() - t0:.2f}s')
-
 KERNEL_METRICS = {"cka", "unbiased_cka", "cknna", "mutual_knn", "cknda"}
 
-def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permutations=200, quantile=0.95, unbiased=True):
+def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permutations=200, quantile=0.95, unbiased=True, perms=None):
+    """
+    perms: optional (P, n) integer tensor of row permutations of feats_B. Pass the SAME perms for every
+    layer pair so the null keeps the dependence between pairs (needed for max-over-pairs calibration).
+    """
 
 
     def similarity_cknna(K, L, topk):                         
@@ -596,8 +600,10 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
         return sim
     n = feats_A.shape[0]
     device = feats_A.device
+    if perms is None:
+        perms = torch.stack([torch.randperm(n) for _ in range(num_permutations)])
     kwargs = {}
-    if 'knn' in metric_name:
+    if 'knn' in metric_name and 'all_k' not in metric_name:
         kwargs['topk'] = topk
     if 'nd' in metric_name:
         assert dist is not None, 'dist must be defined'
@@ -608,6 +614,8 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
     hsic_fn = hsic_unbiased if metric_unbiased else hsic_biased
 
     true_score = AlignmentMetrics.measure(metric_name, feats_A, feats_B, **kwargs)
+    if isinstance(true_score, torch.Tensor):
+        true_score = true_score.detach().cpu().numpy()
     null_scores = []
 
     if metric_name in KERNEL_METRICS:
@@ -635,8 +643,8 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
                 lvm_mask = torch.zeros(n, n, device=device)
                 lvm_mask[range_tensor, knn_A] = 1.0
 
-        for _ in range(num_permutations):
-            perm = torch.randperm(n, device=device)
+        for perm in perms:
+            perm = perm.to(device)
 
             L_perm = L[perm][:, perm]
 
@@ -700,14 +708,65 @@ def null_calibrate(metric_name, feats_A, feats_B, topk=10, dist=None, num_permut
             null_scores.append(score)
 
     else:
-        for _ in range(num_permutations):
-            perm = torch.randperm(n, device=device)
+        for perm in perms:
+            perm = perm.to(device)
             feats_B_perm = feats_B[perm]
             score = AlignmentMetrics.measure(metric_name, feats_A, feats_B_perm, **kwargs)
+            if isinstance(score, torch.Tensor):
+                score = score.detach().cpu().numpy()
             null_scores.append(score)
 
     null_scores = np.array(null_scores)
-    null_quantile = np.quantile(null_scores, quantile)
-    gated_score = max(0, true_score - null_quantile)
 
-    return {"raw": true_score, "null_quantile": null_quantile, "gated": gated_score, "null_scores": null_scores}
+    if len(null_scores.shape) == 1:
+        null_quantile = np.quantile(null_scores, quantile)
+        gated_score = max(0, true_score - null_quantile)
+
+        return {"raw": true_score, "null_quantile": null_quantile, "gated": gated_score, "null_scores": null_scores}
+    else:
+        assert len(null_scores.shape) == 2
+
+        null_quantile = np.quantile(null_scores, quantile, axis=0)
+        gated_score = np.maximum(0, true_score - null_quantile)
+
+        return {"raw": true_score, "null_quantile": null_quantile, "gated": gated_score, "null_scores": null_scores}
+
+
+if __name__ == "__main__":
+    import torch.nn.functional as F
+    torch.manual_seed(0)
+    feats_A = torch.randn(64, 8192)
+    feats_B = torch.randn(64, 8192)
+    feats_A = F.normalize(feats_A, dim=-1)
+    feats_B = F.normalize(feats_B, dim=-1)
+
+    import time 
+    trials = 10
+
+    t0 = time.time()
+    for metric in AlignmentMetrics.SUPPORTED_METRICS:
+
+        scores, times = [], []
+        for t in range(trials):
+            t_st = time.time()
+
+            kwargs = {}
+            if 'nn' in metric and 'all_k' not in metric:
+                kwargs['topk'] = 10
+            if 'cca' in metric:
+                kwargs['cca_dim'] = 10
+            if 'kernel' in metric:
+                kwargs['dist'] = 'sample'
+
+            score = AlignmentMetrics.measure(metric, feats_A, feats_B, **kwargs)
+
+            if metric == "mutual_knn_all_k":
+                ref = AlignmentMetrics.mutual_knn(feats_A, feats_B, topk=10)
+                assert abs(score[9].item() - ref) < 1e-6, (score[9].item(), ref)
+                score = score[9].item()
+            scores.append(score)
+            scores.append(score)
+            times.append(time.time() - t_st)        
+        print(f"{metric.rjust(20)}: {np.mean(scores):1.3f} [elapsed: {np.mean(times):.2f}s]")
+
+    print(f'Total time: {time.time() - t0:.2f}s')
