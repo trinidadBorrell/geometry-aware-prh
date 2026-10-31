@@ -11,6 +11,10 @@ VITLARGE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_large_patch14_dinov2.lvd14
 LLAMA3B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_3b/shard_0000.pt
 VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/shard_0000.pt
 
+
+LLAMA7B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_7b/shard_0000.pt
+VITLARGE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_large_patch14_dinov2.lvd142m/shard_0000.pt
+
 OUT_PATH="/workspace/results/emily/mutual_knn_all_k"
 # OUT_PATH="/workspace/results/emily/nc_metrics_1025_streamline"
 
@@ -70,11 +74,11 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
 
 # mutual_knn at every k=1..N-1 in one call per model pair (no --topk sweep needed).
 # Null: NUM_PERMS shuffles per layer pair; override with e.g. `NUM_PERMS=1000 bash run.sh`.
-NUM_PERMS=${NUM_PERMS:-200}
-for setting in "${SETTINGS[@]}"; do
-    IFS='|' read -r x y out <<< "$setting"
-    align "$x" "$y" "$out" --metric mutual_knn_all_k --num-permutations "$NUM_PERMS"
-done
+# NUM_PERMS=${NUM_PERMS:-200}
+# for setting in "${SETTINGS[@]}"; do
+#     IFS='|' read -r x y out <<< "$setting"
+#     align "$x" "$y" "$out" --metric mutual_knn_all_k --num-permutations "$NUM_PERMS"
+# done
 
 # ---- 10k pair: k/N scaling ----
 # One all-k call returns mKNN at every k=1..N-1 (so every k/N), for every layer pair. Rank matrices are
@@ -83,8 +87,11 @@ done
 # Cost warning: the null runs P shuffles on EVERY layer pair at N=10k. Time one run before launching.
 NUM_PERMS_BIG=${NUM_PERMS_BIG:-200}
 OUT_BIG="/workspace/results/emily/mutual_knn_all_k_10k"
-align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG" \
-    --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
+align "$LLAMA7B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
+align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
+align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
+
+
 
 # Alternative (much more expensive for >3 k values): single-k runs at k matched in k/N to the 1024 runs.
 # N_SMALL=1024; N_BIG=10000   # set N_BIG to the actual shard size
