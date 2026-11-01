@@ -73,6 +73,8 @@ def main() -> None:
     parser.add_argument("--ks", default="10,30")
     parser.add_argument("--models", default="all", help="comma list or all")
     parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--llm-pool", default="avg", help="avg (cached PRH) or last (exp-015)")
+    parser.add_argument("--vit-pool", default="cls", help="cls (cached PRH) or avg (exp-015)")
     args = parser.parse_args()
     import torch.nn.functional as F
 
@@ -91,7 +93,10 @@ def main() -> None:
     models = e12.LLMS + e12.VITS if args.models == "all" else args.models.split(",")
     layout, tasks = {}, []
     for model in models:
-        payload = ac.load_model(root, model, e12.variant(model))
+        var = e12.variant(model)
+        pool = args.llm_pool if model in e12.LLMS else args.vit_pool
+        var = ac.Variant(var.dataset, var.subset, pool, var.caption_idx, var.modality)
+        payload = ac.load_model(root, model, var)
         if payload is None:
             print(f"[skip] {model}: not cached", flush=True)
             continue
