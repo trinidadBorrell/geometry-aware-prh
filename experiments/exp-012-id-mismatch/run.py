@@ -64,12 +64,14 @@ VITS = [
 ]
 
 
-def variant(model: str) -> ac.Variant:
+def variant(model: str, llm_pool: str = "avg", vit_pool: str = "cls") -> ac.Variant:
+    """PRH wit_1024 cache entry; the defaults are the PRH pooling (exp-015 adds LLM `last` and
+    ViT `avg`)."""
     language = model in LLMS
     return ac.Variant(
         dataset="minhuh/prh",
         subset="wit_1024",
-        pool="avg" if language else "cls",
+        pool=llm_pool if language else vit_pool,
         caption_idx=0 if language else None,
         modality="language" if language else "vision",
     )
@@ -99,6 +101,8 @@ def main() -> None:
     parser.add_argument("--permutations", type=int, default=200)
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--llm-pool", default="avg", help="avg (PRH) or last (exp-015)")
+    parser.add_argument("--vit-pool", default="cls", help="cls (PRH) or avg (exp-015)")
     args = parser.parse_args()
     root = args.root or ac.default_root()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -111,7 +115,7 @@ def main() -> None:
     todo = [p for p in pairs(args.tracks.split(",")) if not (args.out / "pairs" / name(p)).exists()]
     caches = {}
     for model in sorted({m for _, a, b in todo for m in (a, b)}):
-        payload = ac.load_model(root, model, variant(model))
+        payload = ac.load_model(root, model, variant(model, args.llm_pool, args.vit_pool))
         if payload is None:
             print(f"[skip] {model}: not cached")
             continue
