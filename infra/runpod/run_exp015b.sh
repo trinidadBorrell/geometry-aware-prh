@@ -67,7 +67,7 @@ print(' '.join(m.LLMS + m.VITS))")
 
 job() {
   set -e
-  extract_all
+  [ "${SKIP_EXTRACT:-0}" = "1" ] || extract_all
   cpu uv run python experiments/exp-014-orc-paired/compute.py --out "$R15/orc" \
     --llm-pool last --vit-pool avg --workers "$WORKERS" > "$RES/exp-015-orc.log" 2>&1
   echo "orc done"
