@@ -131,3 +131,31 @@ ORC agreement add anything beyond each sample's neighbour overlap between the tw
 partial correlation of ORC agreement with per-sample mutual-kNN overlap)? That is a cheap local
 analysis on the existing outputs. The matched-pooling re-extraction (Phase B steps 5-7) is
 worth doing for the pooling confound in exp-010 / exp-012 regardless of ORC.
+
+### Per-sample check: does ORC agree beyond shared neighbours?
+
+`per_sample.py` (local; the models cached on this machine: 3 BLOOMZ sizes, so T1 is
+within-family only, and 4 ViTs, 6 T2 pairs). At each pair's best layer pair (by ORC given
+density), per sample s: o(s) = share of s's k nearest neighbours the two models have in common
+(the per-sample form of mutual kNN). Then (i) ORC agreement given density, (ii) the same with o(s)
+also removed from both sides, (iii) ORC-given-density agreement within strata of o(s), each against
+a within-stratum permutation null (200 shuffles). Output `per_sample.txt` / `.jsonl`.
+
+| | k = 10 | k = 30 |
+|---|---|---|
+| T1 (3 BLOOMZ pairs): ORC given density -> also given overlap | 0.75-0.77 -> 0.72-0.73 | 0.83-0.84 -> 0.78-0.80 |
+| T2 (6 ViT pairs): ORC given density -> also given overlap | 0.45-0.65 -> 0.36-0.59 | 0.51-0.71 -> 0.38-0.63 |
+| agreement among samples with 0 < o <= 0.3 | +0.31 to +0.53 (n 32-494, all p <= 0.005) | -0.03 to +0.47 (n 41-158; 4 of 5 p <= 0.015) |
+| agreement among samples with o = 0 | +0.30 (one pair with >= 30 such samples, n 36, p = 0.04) | none with >= 30 samples |
+
+- **Most of the ORC agreement survives removing neighbour overlap** (85-95% of the correlation),
+  and models agree on a sample's ORC even where they share few or none of its neighbours. So
+  per sample, ORC carries alignment information that mutual kNN does not: two models can place a
+  sample in a similarly clustered / curved local configuration without giving it the same
+  neighbours.
+- Combined with result 3: the *layer-pair pattern* of ORC agreement follows mutual kNN, but the
+  *per-sample content* is largely separate.
+- Caveats: local subset only (T1 within-family); best layer pairs were chosen on ORC agreement,
+  which favours ORC in absolute terms (the partial vs full comparison is on the same cells); the
+  stratified tests have small n in the lowest-overlap strata, especially at k = 30. The full 181
+  pairs can be run on the next pod (the kNN sets need the activations on the volume).
