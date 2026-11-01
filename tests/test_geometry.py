@@ -64,3 +64,25 @@ def test_exact_orc_matches_personamanifold():
     u0 = out["edges"][0, 0]
     inc = (out["edges"] == u0).any(axis=1)
     assert out["node"][u0] == pytest.approx(out["edge"][inc].mean())
+
+
+def test_exact_orc_identical_points():
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal((30, 3))
+    x[1] = x[0]  # a duplicate pair
+    out = geo.ollivier_ricci_exact(geo.knn_graph(x, 4))
+    dup = (out["edges"] == [0, 1]).all(axis=1)
+    assert np.isnan(out["edge"][dup]).all()
+    assert np.isfinite(out["edge"][~dup]).all() and np.isfinite(out["node"]).all()
+
+
+def test_exact_orc_isolated_duplicates():
+    rng = np.random.default_rng(4)
+    x = rng.standard_normal((30, 3))
+    x[:6] = x[0]  # six identical points: their kNN (k = 4) are all at distance 0
+    g = geo.knn_graph(x, 4)
+    out = geo.ollivier_ricci_exact(g)  # must not fail
+    degree = np.diff(g.indptr)
+    assert (degree == 0).any()  # some duplicates are isolated (zero distances are implicit)
+    assert np.isnan(out["node"][degree == 0]).all()
+    assert np.isfinite(out["node"][6:]).all()

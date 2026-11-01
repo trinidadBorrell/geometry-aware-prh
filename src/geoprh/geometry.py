@@ -78,7 +78,8 @@ def ollivier_ricci_exact(graph, alpha: float = 0.0) -> dict:
     """Ollivier-Ricci curvature of every edge of a weighted graph, PersonaManifold's convention
     (their `edge_curvature`, checked equal in tests/test_geometry.py): mu_x = alpha on x, the
     rest uniform on x's graph neighbours; W1 by exact transport (POT) with shortest-path costs;
-    kappa = 1 - W1 / d(x, y). Node curvature = mean over incident edges. Pure numpy/POT, so it
+    kappa = 1 - W1 / d(x, y). Node curvature = mean over incident edges. Edges between identical
+    points (d = 0) are undefined (NaN) and left out of the node means. Pure numpy/POT, so it
     runs anywhere (GraphRicciCurvature needs the fork start method).
 
     Returns {"edge": [E], "node": [n], "edges": [E, 2]}.
@@ -92,17 +93,24 @@ def ollivier_ricci_exact(graph, alpha: float = 0.0) -> dict:
     supports, masses = [], []
     for i in range(n):
         supports.append(np.r_[i, nbrs[i]])
-        masses.append(np.r_[alpha, np.full(len(nbrs[i]), (1 - alpha) / len(nbrs[i]))])
+        # a point whose neighbours all coincide with it has no stored edges (zero distances are
+        # implicit in a sparse graph): no measure, node curvature NaN
+        k_i = max(len(nbrs[i]), 1)
+        masses.append(np.r_[alpha, np.full(len(nbrs[i]), (1 - alpha) / k_i)])
     coo = graph.tocoo()
     keep = coo.row < coo.col
     edges = np.column_stack([coo.row[keep], coo.col[keep]])
-    kap = np.empty(len(edges))
+    kap = np.full(len(edges), np.nan)
     for e, (u, v) in enumerate(edges):
+        if d[u, v] <= 0:  # identical points (e.g. duplicate captions): kappa undefined
+            continue
         cost = d[np.ix_(supports[u], supports[v])]
         kap[e] = 1 - ot.emd2(masses[u], masses[v], cost) / d[u, v]
-    node_sum = np.bincount(edges.ravel(), weights=np.repeat(kap, 2), minlength=n)
-    node_cnt = np.bincount(edges.ravel(), minlength=n)
-    return {"edge": kap, "node": node_sum / np.maximum(node_cnt, 1), "edges": edges}
+    ok = np.isfinite(kap)
+    node_sum = np.bincount(edges[ok].ravel(), weights=np.repeat(kap[ok], 2), minlength=n)
+    node_cnt = np.bincount(edges[ok].ravel(), minlength=n)
+    node = np.where(node_cnt > 0, node_sum / np.maximum(node_cnt, 1), np.nan)
+    return {"edge": kap, "node": node, "edges": edges}
 
 
 def knn_distance(x: np.ndarray, k: int) -> np.ndarray:
