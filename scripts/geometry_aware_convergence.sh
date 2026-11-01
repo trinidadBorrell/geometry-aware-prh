@@ -87,8 +87,8 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
 # Cost warning: the null runs P shuffles on EVERY layer pair at N=10k. Time one run before launching.
 NUM_PERMS_BIG=${NUM_PERMS_BIG:-200}
 OUT_BIG="/workspace/results/emily/mutual_knn_all_k_10k"
-align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
-# align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
+# align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
+align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
 # align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
 
 
