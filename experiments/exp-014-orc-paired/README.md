@@ -134,28 +134,74 @@ worth doing for the pooling confound in exp-010 / exp-012 regardless of ORC.
 
 ### Per-sample check: does ORC agree beyond shared neighbours?
 
-`per_sample.py` (local; the models cached on this machine: 3 BLOOMZ sizes, so T1 is
-within-family only, and 4 ViTs, 6 T2 pairs). At each pair's best layer pair (by ORC given
+`per_sample.py`, run on the pod for all 181 T1 / T2 pairs (2026-11-01, commit `fc3e747`; a first
+local run on 9 pairs gave the same picture). At each pair's best layer pair (by ORC given
 density), per sample s: o(s) = share of s's k nearest neighbours the two models have in common
 (the per-sample form of mutual kNN). Then (i) ORC agreement given density, (ii) the same with o(s)
 also removed from both sides, (iii) ORC-given-density agreement within strata of o(s), each against
 a within-stratum permutation null (200 shuffles). Output `per_sample.txt` / `.jsonl`.
 
+Medians over pairs (a stratum counts only for pairs with >= 30 samples in it):
+
 | | k = 10 | k = 30 |
 |---|---|---|
-| T1 (3 BLOOMZ pairs): ORC given density -> also given overlap | 0.75-0.77 -> 0.72-0.73 | 0.83-0.84 -> 0.78-0.80 |
-| T2 (6 ViT pairs): ORC given density -> also given overlap | 0.45-0.65 -> 0.36-0.59 | 0.51-0.71 -> 0.38-0.63 |
-| agreement among samples with 0 < o <= 0.3 | +0.31 to +0.53 (n 32-494, all p <= 0.005) | -0.03 to +0.47 (n 41-158; 4 of 5 p <= 0.015) |
-| agreement among samples with o = 0 | +0.30 (one pair with >= 30 such samples, n 36, p = 0.04) | none with >= 30 samples |
+| T1 (45): ORC given density -> also given overlap | 0.60 -> 0.54 (90% kept) | 0.68 -> 0.62 (92%) |
+| T2 (136): ORC given density -> also given overlap | 0.57 -> 0.52 (91%) | 0.64 -> 0.56 (88%) |
+| low overlap 0 < o <= 0.3: agreement (pairs; share significant) | T1 +0.34 (35; 100%), T2 +0.37 (126; 98%) | T1 +0.23 (25; 56%), T2 +0.24 (76; 66%) |
+| no overlap o = 0 | T1 +0.14 (2; 0%), T2 +0.06 (9; 22%) | too few samples |
+| high overlap o > 0.3 | T1 +0.64, T2 +0.61 (all significant) | T1 +0.69, T2 +0.65 |
 
-- **Most of the ORC agreement survives removing neighbour overlap** (85-95% of the correlation),
-  and models agree on a sample's ORC even where they share few or none of its neighbours. So
-  per sample, ORC carries alignment information that mutual kNN does not: two models can place a
-  sample in a similarly clustered / curved local configuration without giving it the same
-  neighbours.
-- Combined with result 3: the *layer-pair pattern* of ORC agreement follows mutual kNN, but the
-  *per-sample content* is largely separate.
-- Caveats: local subset only (T1 within-family); best layer pairs were chosen on ORC agreement,
-  which favours ORC in absolute terms (the partial vs full comparison is on the same cells); the
-  stratified tests have small n in the lowest-overlap strata, especially at k = 30. The full 181
-  pairs can be run on the next pod (the kNN sets need the activations on the volume).
+Within-family pairs keep 93-95% of their ORC agreement after removing overlap, across-family
+pairs 87-91%.
+
+- **Most of the ORC agreement survives removing neighbour overlap** (about 90% of the
+  correlation), and it persists, at about half strength, among samples whose neighbourhoods are
+  mostly different (0 < o <= 0.3, significant in nearly all pairs at k = 10).
+- **But it fades where the models share no neighbours at all** (o = 0: +0.06 to +0.14, rarely
+  significant, and few pairs have enough such samples). So per-sample ORC adds information on
+  top of partially shared neighbourhoods; it is not an independent channel of agreement.
+- Combined with result 3: the layer-pair pattern of ORC agreement follows mutual kNN; per sample,
+  ORC refines it (how clustered / curved a sample's neighbourhood is) rather than replacing it.
+- Caveat: best layer pairs were chosen on ORC agreement, which favours ORC in absolute terms; the
+  full vs partial comparison is on the same cells.
+
+### ORC across neighbourhood sizes (k-sweep)
+
+`k_sweep.py` (pod, same run): BLOOMZ-7b1, LLaMA-13b, DINOv2-giant, CLIP-huge at relative depths
+0.1 / 0.5 / 0.9, k = 5, 10, 20, 50, 100, 200 (n = 1024, 2 duplicate samples dropped). Raw ORC rises
+with k for any data (neighbourhoods overlap more; a complete graph has kappa -> 1), so two
+readouts: the gap between the layer's median node ORC and a uniform flat torus with the same n,
+k and ID; and the agreement (ORC given density) between the two LLMs and between the two ViTs at
+the same relative depth. Output `k_sweep/k_sweep.json`.
+
+**Gap to the flat reference** (range over the 12 layers):
+
+| k | 5 | 10 | 20 | 50 | 100 | 200 |
+|---|---|---|---|---|---|---|
+| median ORC - flat torus | +0.50 to +0.76 | +0.50 to +0.74 | +0.29 to +0.51 | +0.15 to +0.28 | +0.08 to +0.17 | +0.04 to +0.18 |
+
+All four models are far more locally clustered than uniform sampling at small scales; the
+excess fades steadily and is mostly gone by k ~ 100 (10% of the data). The early LLaMA layer
+keeps the largest excess at large k (+0.17 to +0.18). The curves are similar across models and
+modalities, so this measures the scale of the data's clustering and density heterogeneity (its
+"granularity"), not a curvature radius: exp-011 / exp-013 showed smooth curvature moves ORC by
+~0.1 at k = 10 and ~0 at large k.
+
+**Agreement by k** (ORC given density / density, Spearman across samples):
+
+| pair, depth | k = 5 | 10 | 20 | 50 | 100 | 200 |
+|---|---|---|---|---|---|---|
+| BLOOMZ-7b1 x LLaMA-13b, 0.1 | +0.03 / -0.54 | -0.06 / -0.65 | -0.14 / -0.71 | -0.07 / -0.77 | +0.06 / -0.79 | -0.08 / -0.76 |
+| BLOOMZ-7b1 x LLaMA-13b, 0.5 | +0.36 / +0.71 | +0.50 / +0.71 | +0.56 / +0.69 | +0.53 / +0.66 | +0.52 / +0.66 | +0.57 / +0.66 |
+| BLOOMZ-7b1 x LLaMA-13b, 0.9 | +0.41 / +0.77 | +0.55 / +0.79 | +0.62 / +0.78 | +0.62 / +0.76 | +0.61 / +0.73 | +0.52 / +0.69 |
+| DINOv2-g x CLIP-h, 0.1 | +0.40 / +0.84 | +0.52 / +0.87 | +0.58 / +0.90 | +0.63 / +0.92 | +0.59 / +0.93 | +0.45 / +0.92 |
+| DINOv2-g x CLIP-h, 0.5 | +0.14 / +0.67 | +0.18 / +0.68 | +0.12 / +0.69 | +0.08 / +0.72 | +0.01 / +0.74 | +0.12 / +0.74 |
+| DINOv2-g x CLIP-h, 0.9 | +0.23 / +0.48 | +0.22 / +0.44 | +0.17 / +0.39 | +0.09 / +0.23 | +0.09 / +0.22 | +0.05 / +0.20 |
+
+- Where the models agree, ORC agreement is lowest at k = 5 and plateaus at k ~ 20-100 (2-10% of
+  the data): that is the neighbourhood scale at which per-sample structure is shared.
+- Agreement depends on the layer pair much more than on k (same-depth layers are not always the
+  best-aligned pair; exp-012 / exp-014 find the best ViT pairs early).
+- Early-layer BLOOMZ and LLaMA *anti*-agree on density (-0.54 to -0.79): captions that are dense in
+  one model's embedding layer are sparse in the other's, presumably from their different
+  tokenizers and vocabularies.
