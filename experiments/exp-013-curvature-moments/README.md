@@ -3,8 +3,9 @@
 **Status:** done (v2) · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-013-curvature-moments/`
 
 Part of WP0 (estimator validation) and WP5 (invariants) of the
-[proposal](../proposal-geometry-aware-prh.md). Follows exp-011, where Ollivier-Ricci curvature had
-the wrong sign and local PCA could not see curvature at our IDs.
+[proposal](../proposal-geometry-aware-prh.md). Follows exp-011, where Ollivier-Ricci curvature was
+dominated by ID- and k-dependent offsets (the curvature signal is small and only comparable at
+matched ID, k and sampling) and local PCA could not see curvature at our IDs.
 
 ## Why this experiment
 
@@ -41,8 +42,10 @@ in *intrinsic* curvature, that is an invariant no choice of ruler can remove (H2
 ### Why the earlier tools could not answer it
 
 exp-011 showed:
-- Ollivier-Ricci curvature on kNN graphs is dominated by a high-dimensional negative bias and
-  ranks the sphere below flat space.
+- Ollivier-Ricci curvature on kNN graphs is dominated by offsets set by the ID and k; against a
+  boundary-free flat torus it ranks a sphere correctly, but the difference is small (+0.10 to
+  +0.13 at k = 10, +0.004 at k = 5d) and strongly coupled to sampling density (exp-011, corrected
+  2026-11-01; the earlier "sphere below flat" came from a cube with boundaries as flat control).
 - Local PCA cannot see a sphere's curvature: a d-sphere lives in d + 1 dimensions, so bending
   adds at most one direction, invisible to a 90% variance count. It also cannot tell an
   intrinsically flat manifold that winds through many directions from an intrinsically curved
