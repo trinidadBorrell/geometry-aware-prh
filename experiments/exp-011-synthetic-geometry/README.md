@@ -91,6 +91,14 @@ bias, ranks the positively curved sphere below flat space, and calls the tree po
 (dense neighbourhoods along its edges). Hypothesis 4 confirmed: ORC on kNN graphs is not usable as
 a curvature estimate at our n and ID.
 
+*Correction (2026-11-01, see "Positive control" at the end).* The flat control here is a cube,
+whose boundaries (near almost every point at ID 20-40) raise ORC. Against a boundary-free flat
+torus at the same ID, n and k, the sphere comes out *higher* (+0.10 at ID 5, +0.13 at ID 20, k = 10):
+the order is right. What stands: the absolute level and sign are set by the ID and k (the torus
+alone moves from -0.46 to -1.01 between ID 5 and 20), so ORC values are not interpretable as
+curvature on their own; only differences at matched ID, k, n and sampling carry curvature
+information, and the effect is small.
+
 **5. The local PCA profile does not see curvature here.** At k = 500 the local dimension is
 0.85-0.9 of the ID for flat, sphere and Swiss roll alike (17 / 18 / 18 at ID 20, 34 / 34 / 34 at
 ID 40); at k = 10 it saturates at 7-8 whatever the ID (11 points cannot span more). Neighbourhoods
@@ -166,9 +174,12 @@ graph (Euclidean twin within 0.03-0.08 everywhere):
 
 - The sign is set by k and the ID, not by the geometry: with k = 5d everything is negative at
   ID 5 and positive at ID 20-40 (exp-011 point 4, with k = 10-30, was negative throughout).
-- The order is inverted relative to the truth at every ID: the sphere is always the *lowest*,
-  below flat space; the tree and the clusters are the *highest*. Whitening changes nothing that
-  matters.
+- ~~The order is inverted relative to the truth~~ (withdrawn 2026-11-01): the sphere sits below
+  the flat *cube*, but the cube's boundaries confound that comparison; against a boundary-free
+  flat torus the sphere is higher (Positive control below). The tree and clusters are the
+  highest, but their "true" curvature at the kNN scale is not well defined (the thick tree is
+  locally a thin tube; the clusters are compact blobs), so they do not test the sign.
+  Whitening changes nothing that matters.
 
 **2. Density and curvature are strongly coupled, not weakly.** On a single, uniformly sampled
 flat cube (the null scenario, no curvature anywhere) Spearman(density, node ORC) is -0.50 at ID 5
@@ -176,6 +187,9 @@ and -0.95 at ID 20 and 40: ORC is almost a deterministic function of the samplin
 density. The sign of the coupling depends on the geometry (flat -0.95, sphere +0.32 or -0.31,
 clusters +0.30 or +0.48 at ID 20 / 40), so in a mixture of regions it can partly cancel, and a
 small overall rho (theirs: 0.08) does not show that curvature is independent of density.
+The coupling is not a boundary artefact: on boundary-free, uniformly sampled manifolds (sphere,
+flat torus) Spearman(density, node ORC) is +0.51 to +0.55 at ID 5 (k = 25) and +0.66 to +0.70 at
+ID 20 (k = 100); the negative sign on the cube comes from its boundaries.
 (Separately, with n ~ 2000, rho = 0.08 has p ~ 3e-4 and rho = 0.11 has p ~ 1e-6, so "n.s." in
 their Appendix E is only possible if the correlation was computed on far fewer points.)
 
@@ -186,7 +200,8 @@ their Appendix E is only possible if the correlation was computed on far fewer p
   in every quintile (at ID 5 the gap changes sign across quintiles). The difference comes from the grouping: edges between members of a tight group are
   very short, and kappa = 1 - W1 / d(x, y) divides by that short distance.
 - *mixture*: p < 0.001 in every quintile (4/4, 4/4, 5/5), with the type order tree > clusters >
-  flat > sphere, the reverse of the true curvature (sphere +, flat 0, tree -).
+  flat > sphere. (Not usable as evidence of a reversed order: the flat component is a cube, and
+  the tree / cluster curvature at the kNN scale is ill-defined; see the correction above.)
 - *null*: no quintile significant (p = 0.05-1) at any ID, so the test is not trivially
   significant; it detects *some* structural difference between groups, but nothing in it ties
   that difference to curvature.
@@ -194,13 +209,19 @@ their Appendix E is only possible if the correlation was computed on far fewer p
 ### What this means for the PersonaManifold claims
 
 - "Professional personas tend toward positive curvature; fictional characters exhibit negative
-  curvature" describes differences in node ORC that our synthetic data reproduces from grouping,
-  cluster structure and density alone, with the sign set by k and the ID. With their k = 5d and
-  d* ~ 20, flat data is already positive (+0.17), so positive values cannot be read as
-  sphere-like, nor negative ones as saddle-like.
+  curvature" describes differences in node ORC that our synthetic data reproduces from grouping
+  and density alone, with the sign set by k and the ID. With their k = 5d and d* ~ 20, flat data
+  is already positive (+0.10 to +0.17), so positive values cannot be read as sphere-like, nor
+  negative ones as saddle-like.
+- Smooth curvature moves ORC very little at their settings: at ID 20, k = 100, the unit sphere and
+  the flat torus differ by +0.004 in mean node ORC, and the per-node spread on either is
+  sd 0.005-0.007. Their persona curvatures span about -0.6 to +0.6 (Fig. 2), which on these numbers
+  must come mostly from non-uniform sampling (groups, density, clusters), not from smooth bending.
 - Their density-matched test cannot certify that the heterogeneity is intrinsic geometry: it
-  passes on intrinsically flat data that differs only in grouping, and on a mixture whose
-  curvature order it reverses.
+  passes on intrinsically flat data that differs only in grouping.
+- What we do not show: that ORC differences between persona types are absent in their data, or
+  that ORC carries no curvature information. At matched ID, k and sampling, it ranks a sphere above
+  a flat torus correctly; the problem is separating that small signal from density and grouping.
 - Their public code does not include the node-curvature, density or persona-scale pipeline, so
   the paper's own numbers cannot be rerun; this addendum replicates the construction as specified
   in Section 3.2, Table A.1 and the released `curvature.py`.
@@ -208,3 +229,27 @@ their Appendix E is only possible if the correlation was computed on far fewer p
   depend on ORC meaning curvature and are not addressed here.
 - For this project: graph Ollivier-Ricci curvature is dropped (as in Gate A above); any curvature
   claim about model representations needs controls of the kind used here.
+
+## Positive control: sphere vs boundary-free flat torus (2026-11-01)
+
+`orc_positive_control.py` (local, POT exact transport; matches PersonaManifold's `edge_curvature`
+to 4e-16). Both manifolds uniformly sampled, no noise, union kNN graph with Euclidean edges:
+unit sphere S^d vs Clifford torus T^d = (S^1)^d in R^{2d} (intrinsically flat, no boundary).
+Mean node ORC (alpha = 0, their convention; alpha = 0.5 gives half the values, same order):
+
+| ID | n | k | sphere | flat torus | sphere - torus |
+|---|---|---|---|---|---|
+| 2 | 3000 | 10 | -0.025 | -0.024 | -0.001 |
+| 2 | 3000 | 30 | +0.007 | +0.004 | +0.003 |
+| 5 | 3000 | 10 | -0.363 | -0.462 | +0.098 |
+| 5 | 3000 | 25 | -0.173 | -0.287 | +0.114 |
+| 5 | 2000 | 25 | -0.151 | -0.262 | +0.112 |
+| 20 | 2000 | 10 | -0.878 | -1.011 | +0.134 |
+| 20 | 2000 | 100 (= 5d) | +0.105 | +0.100 | +0.004 |
+
+- At matched ID, n and k, ORC ranks the sphere above the flat torus: the curvature signal has the
+  right sign. At ID 2 it is tiny (neighbourhoods are small compared with the curvature radius).
+- The absolute level moves far more with ID and k than with curvature, and at PersonaManifold's
+  k = 5d the difference nearly vanishes (+0.004 at ID 20).
+- Within each manifold, node ORC tracks local sampling density (Spearman +0.51 to +0.70).
+
