@@ -93,7 +93,21 @@ def main() -> None:
     args = parser.parse_args()
     e12 = _exp012()
     ks = [int(k) for k in args.ks.split(",")]
-    models = {p.stem: np.load(p) for p in (args.root / "models").glob("*.npz")}
+    models = {p.stem: dict(np.load(p)) for p in (args.root / "models").glob("*.npz")}
+    # Exact-duplicate captions (one pair in the PRH wit_1024 set) give near-zero LLM edge lengths
+    # and kappa = 1 - W1/d ~ -1e5 for those samples; drop them from every model.
+    n_samples = next(iter(models.values()))[f"orc_k{ks[0]}"].shape[1]
+    bad = np.zeros(n_samples, bool)
+    for z in models.values():
+        for k in ks:
+            bad |= (z[f"orc_k{k}"] < -5).any(axis=0)
+    for z in models.values():
+        for key in list(z):
+            if key.startswith(("orc_", "dens_")):
+                z[key] = z[key][:, ~bad]
+    print(
+        f"dropped {int(bad.sum())} samples with degenerate ORC (duplicates): {np.flatnonzero(bad).tolist()}"
+    )
     pairs = [("T1", a, b) for a, b in itertools.combinations(e12.LLMS, 2)]
     pairs += [("T2", a, b) for a, b in itertools.combinations(e12.VITS, 2)]
     pairs = [p for p in pairs if slug(p[1]) in models and slug(p[2]) in models]
@@ -219,15 +233,13 @@ def main() -> None:
             if slug(m) not in models:
                 continue
             z = models[slug(m)]
-            orc = z[f"orc_k{k}"].mean(axis=1)
+            orc = np.median(z[f"orc_k{k}"], axis=1)
             ids = np.rint(z["twonn"]).astype(int)
             ref = np.array([refs.get(f"d{d}_k{k}", np.nan) for d in ids])
             depth = np.linspace(0, 1, len(orc))
             ax.plot(depth, orc - ref, color="#2a78d6", alpha=0.6, lw=1.2)
         ax.axhline(0, color=INK_MUTED, lw=0.8)
-        ax.set_title(
-            f"{title}: mean node ORC minus flat-torus reference at the layer's ID (k = {k})"
-        )
+        ax.set_title(f"{title}: median node ORC minus flat-torus mean at the layer's ID (k = {k})")
         ax.set_xlabel("relative depth")
     axes[0].set_ylabel("ORC - reference")
     save(fig, args.root, "fig3_levels")
