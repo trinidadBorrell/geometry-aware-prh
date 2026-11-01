@@ -48,3 +48,19 @@ def test_local_pca_flat_vs_sphere():
     circle = syn.embed(syn.sphere(2000, 1, rng)[0], 20, rng)
     prof = geo.local_pca_profile(circle, [5, 1000], n_centres=30)
     assert prof[0]["dim"] == 1 and prof[1]["dim"] == 2  # a large arc needs two directions
+
+
+def test_exact_orc_matches_personamanifold():
+    from personamanifold import PersonaManifold
+    from personamanifold.curvature import edge_curvature
+
+    rng = np.random.default_rng(0)
+    pm = PersonaManifold(n_neighbors=5, variance=1.0, tangent_dim=3, ridge=1e-4)
+    pm.fit(rng.standard_normal((40, 3)))
+    out = geo.ollivier_ricci_exact(pm.graph_, alpha=0.0)
+    for (u, v), kap in list(zip(out["edges"], out["edge"], strict=True))[:15]:
+        assert kap == pytest.approx(edge_curvature(pm, int(u), int(v)), abs=1e-9)
+    # node curvature = mean over incident edges
+    u0 = out["edges"][0, 0]
+    inc = (out["edges"] == u0).any(axis=1)
+    assert out["node"][u0] == pytest.approx(out["edge"][inc].mean())

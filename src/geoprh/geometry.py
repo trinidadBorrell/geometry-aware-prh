@@ -74,6 +74,43 @@ def ollivier_ricci(graph, alpha: float = 0.5, proc: int = 1) -> dict:
     return {"edge": edges, "node": nodes}
 
 
+def ollivier_ricci_exact(graph, alpha: float = 0.0) -> dict:
+    """Ollivier-Ricci curvature of every edge of a weighted graph, PersonaManifold's convention
+    (their `edge_curvature`, checked equal in tests/test_geometry.py): mu_x = alpha on x, the
+    rest uniform on x's graph neighbours; W1 by exact transport (POT) with shortest-path costs;
+    kappa = 1 - W1 / d(x, y). Node curvature = mean over incident edges. Pure numpy/POT, so it
+    runs anywhere (GraphRicciCurvature needs the fork start method).
+
+    Returns {"edge": [E], "node": [n], "edges": [E, 2]}.
+    """
+    import ot
+
+    graph = graph.tocsr()
+    n = graph.shape[0]
+    d = shortest_path(graph, method="D", directed=False)
+    nbrs = [graph.indices[graph.indptr[i] : graph.indptr[i + 1]] for i in range(n)]
+    supports, masses = [], []
+    for i in range(n):
+        supports.append(np.r_[i, nbrs[i]])
+        masses.append(np.r_[alpha, np.full(len(nbrs[i]), (1 - alpha) / len(nbrs[i]))])
+    coo = graph.tocoo()
+    keep = coo.row < coo.col
+    edges = np.column_stack([coo.row[keep], coo.col[keep]])
+    kap = np.empty(len(edges))
+    for e, (u, v) in enumerate(edges):
+        cost = d[np.ix_(supports[u], supports[v])]
+        kap[e] = 1 - ot.emd2(masses[u], masses[v], cost) / d[u, v]
+    node_sum = np.bincount(edges.ravel(), weights=np.repeat(kap, 2), minlength=n)
+    node_cnt = np.bincount(edges.ravel(), minlength=n)
+    return {"edge": kap, "node": node_sum / np.maximum(node_cnt, 1), "edges": edges}
+
+
+def knn_distance(x: np.ndarray, k: int) -> np.ndarray:
+    """Distance from each point to its k-th nearest neighbour (self excluded); 1 / it is the
+    local kNN density used in the PersonaManifold-style density control."""
+    return NearestNeighbors(n_neighbors=k + 1).fit(x).kneighbors(x)[0][:, k]
+
+
 def twonn_scales(x: np.ndarray, max_halvings: int = 5, min_n: int = 64, seed: int = 0) -> list:
     """[{"n", "scale", "id"}] for the full set and random subsets of n / 2^j points."""
     rng = np.random.default_rng(seed)
