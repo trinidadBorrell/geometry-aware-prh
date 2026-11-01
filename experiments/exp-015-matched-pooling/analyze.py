@@ -82,8 +82,24 @@ def save(fig, out: Path, name: str) -> None:
     plt.close(fig)
 
 
+def fill_degenerate(orc: np.ndarray, dens: np.ndarray) -> tuple:
+    """Per layer: undefined ORC (points whose neighbours all coincide with them, e.g. LLM last
+    token at layer 0, where captions ending in the same token are identical) -> layer median;
+    infinite density (zero distance to the k-th neighbour) -> layer maximum. These samples become
+    ties in the rank statistics."""
+    orc, dens = orc.copy(), dens.copy()
+    for i in range(orc.shape[0]):
+        bad = ~np.isfinite(orc[i])
+        if bad.any():
+            orc[i, bad] = np.nanmedian(np.where(bad, np.nan, orc[i]))
+        inf = ~np.isfinite(dens[i])
+        if inf.any():
+            dens[i, inf] = dens[i, ~inf].max() if (~inf).any() else 1.0
+    return orc, dens
+
+
 def orc_inputs(z: dict, k: int, keep: np.ndarray) -> tuple:
-    orc, dens = z[f"orc_k{k}"][:, keep], z[f"dens_k{k}"][:, keep]
+    orc, dens = fill_degenerate(z[f"orc_k{k}"][:, keep], z[f"dens_k{k}"][:, keep])
     return paired.residualize(orc, dens), paired.standardized_ranks(dens)
 
 
@@ -187,6 +203,16 @@ def main() -> None:
         for z in group.values():
             bad |= (z[f"orc_k{args.k}"] < -5).any(axis=0)
     bad[DROP] = True
+    for pool, group in (("LLM last", llm["last"]), ("ViT avg", vit["avg"])):
+        counts = {
+            m.split("/")[-1]: int((~np.isfinite(z[f"orc_k{args.k}"])).sum(axis=1).max())
+            for m, z in group.items()
+        }
+        counts = {m: c for m, c in counts.items() if c}
+        if counts:
+            lines.append(
+                f"{pool}: max samples per layer with undefined ORC (identical points): {counts}"
+            )
     keep = np.flatnonzero(~bad)
     lines.append(
         f"ORC: dropped {int(bad.sum())} samples (duplicates / degenerate): {np.flatnonzero(bad).tolist()}"
