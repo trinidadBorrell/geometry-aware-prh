@@ -197,11 +197,11 @@ def main() -> None:
     save(fig, out, "fig2_alignment")
 
     # 3. per-sample ORC agreement (given density) under the three pairings, with references
+    # Only the exact-duplicate caption pair is dropped (as exp-014). Extreme negative ORC from
+    # near-identical points (short edges; common in early LLM last-token layers, where captions
+    # ending in the same token nearly coincide) is kept: the statistics are rank based.
     n = next(iter(llm["avg"].values()))[f"orc_k{args.k}"].shape[1]
     bad = np.zeros(n, bool)
-    for group in (*llm.values(), *vit.values()):
-        for z in group.values():
-            bad |= (z[f"orc_k{args.k}"] < -5).any(axis=0)
     bad[DROP] = True
     for pool, group in (("LLM last", llm["last"]), ("ViT avg", vit["avg"])):
         counts = {
