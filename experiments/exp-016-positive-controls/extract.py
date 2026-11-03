@@ -331,6 +331,7 @@ def main() -> None:
     parser.add_argument("--d2", type=Path, help="prepare_d2.py parquet")
     parser.add_argument("--parts", default="towers,llms,vits,aug,random")
     parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--llm-tokens", type=int, default=16384, help="tokens per LLM batch")
     parser.add_argument("--only", default=None, help="one tower key, LLM, ViT or 'random'")
     parser.add_argument("--hub-dir", default=None, help="print the HF cache folder of a model")
     parser.add_argument("--check", action="store_true")
@@ -397,7 +398,14 @@ def main() -> None:
             assert tokenizer.padding_side == "left"
             for tag, c, texts in todo:
                 meta = {"model": name, "pool": "avg", "caption": c}
-                save(args.out, f"{stem}__{c}", tag, llm_mean(model, tokenizer, texts), None, meta)
+                save(
+                    args.out,
+                    f"{stem}__{c}",
+                    tag,
+                    llm_mean(model, tokenizer, texts, args.llm_tokens),
+                    None,
+                    meta,
+                )
             del model
             gc.collect()
             torch.cuda.empty_cache()

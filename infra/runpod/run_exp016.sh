@@ -18,6 +18,8 @@ OUT=$RES/exp-016-positive-controls
 EXP=experiments/exp-016-positive-controls
 HUB=${HF_HOME:-/workspace/hf}/hub
 WORKERS=${WORKERS:-24}
+LLM_TOKENS=${LLM_TOKENS:-16384}  # tokens per LLM batch (4096 on a 32 GB GPU)
+KEEP_CACHES=${KEEP_CACHES:-6}    # alignment caches held on the GPU (2 on a 32 GB GPU)
 AUTO_TERMINATE=${AUTO_TERMINATE:-0}
 mkdir -p "$OUT"
 git rev-parse HEAD > "$OUT/git_sha.txt"
@@ -40,7 +42,7 @@ print(' '.join([*m.TOWERS, *m.LLMS, *m.VITS, 'random']))")
     [ -n "$d" ] && [ -d "$HUB/$d" ] && existed=1
     for attempt in 1 2 3; do
       if timeout 60m uv run python "$EXP/extract.py" --out "$OUT" --d2 "$OUT/d2.parquet" \
-          --only "$m" >> "$RES/exp-016-extract.log" 2>&1; then ok=0; break; fi
+          --only "$m" --llm-tokens "$LLM_TOKENS" >> "$RES/exp-016-extract.log" 2>&1; then ok=0; break; fi
       echo "$m: attempt $attempt failed" >> "$RES/exp-016-extract.log"
       [ -n "$d" ] && rm -rf "$HUB/$d/blobs/"*.incomplete
     done
@@ -63,7 +65,7 @@ job() {
   cpu uv run python "$EXP/measure.py" --root "$OUT" --stages geometry --workers "$WORKERS" \
     > "$RES/exp-016-geometry.log" 2>&1
   echo "geometry done"
-  uv run python "$EXP/measure.py" --root "$OUT" --stages pairs > "$RES/exp-016-pairs.log" 2>&1
+  uv run python "$EXP/measure.py" --root "$OUT" --stages pairs --keep-caches "$KEEP_CACHES" > "$RES/exp-016-pairs.log" 2>&1
   echo "pairs done"
 }
 
