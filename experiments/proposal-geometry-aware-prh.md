@@ -1,8 +1,67 @@
 # Geometry-aware PRH: wrong ruler or incompatible manifolds?
 
-2026-10-17 · oddharak · exported from the [Claude doc](https://claude.ai/code/artifact/d90b2722-a72a-407f-99db-e6f8c3725ebf); edit this copy in the repo
+2026-10-17, revised 2026-11-03 (Revision 1) · oddharak · exported from the [Claude doc](https://claude.ai/code/artifact/d90b2722-a72a-407f-99db-e6f8c3725ebf); edit this copy in the repo
 
 We propose eight work packages that test whether the Platonic and Aristotelian hypotheses disagree because Euclidean metrics are the wrong ruler for curved representations (H1), or because the representation manifolds are intrinsically incompatible (H2). The plan starts with free checks on cached data and puts confound-free intra-LLM comparisons first; cross-modal LLM-ViT results are read against them until comparable extractions exist.
+
+## Revision 1 (2026-11-03): what we learned and what changes
+
+Experiments exp-011 to exp-015 answered the plan's first question differently than expected: the
+geometry of these representations cannot be measured locally at their dimension, and the
+disagreement between modalities survives every ruler we could validate. The plan therefore moves
+from *estimating geometry, then comparing* to *comparing local and global structure with
+measures whose invariances and biases are known, against positive controls and data ceilings*.
+
+### Findings that change the plan
+
+| experiment | finding | consequence |
+|---|---|---|
+| exp-011 (WP0) | At ID 20-40 and n <= 100k, kNN-graph geodesics are off by 50-150%; graph Ollivier-Ricci curvature (ORC) is set mostly by ID and k and strongly coupled to sampling density; only at matched ID, k and sampling does it rank a sphere above a flat torus, by ~0.1 | Drop graph-geodesic rungs, geodesic scales and curvature values |
+| exp-011 addendum | PersonaManifold's curvature pipeline reproduces "curvature" differences from grouping and density on intrinsically flat data; their density-decoupling test passes on it | Curvature claims need positive and negative controls of this kind |
+| exp-012 (WP1) | ID mismatch predicts lower alignment beyond depth (partial rho -0.2 to -0.4), within modality too; cross-modal alignment peaks at ID-matched layers | ID is the one geometric invariant usable comparatively |
+| exp-013 | The moment curvature estimator separates intrinsically flat from curved at the true ID, but d is not recoverable at ID >= 20 and magnitudes are biased; it works only as a one-sided flatness test. A flat torus reproduces LLM-like PCA90 / ID: nonlinearity in the PCA sense is not intrinsic curvature | Curvature only as a flatness check |
+| exp-014 | Per-sample ORC agreement (rank correlation across samples) is strong within modality (0.57-0.68 after removing density; within family 0.7-0.84); ~90% survives removing neighbour overlap; its layer-pair pattern repeats mutual kNN; the data is far more locally clustered than uniform sampling up to k ~ 100 | ORC kept as a paired local-structure statistic, not as curvature |
+| exp-015 | Pooling explains the opposite LLM / ViT ID profiles (LLM last-token ID rises with depth); matched pooling does not raise cross-modal alignment (mutual kNN, CKA) or cross-modal ORC agreement (0.10-0.16 vs ~0.6 within modality) | The cross-modal gap is not a pooling or ruler artefact, as far as tested |
+
+### Revised hypotheses
+
+- **H1 (wrong ruler):** largely ruled out for the rulers we can validate (Euclidean, cosine,
+  whitened, rank-based, local ORC); untested only for geodesic rulers, which are not estimable.
+- **H3 (shared coarse structure, modality-specific detail):** the current best reading.
+- **H4 (new, shared content bounds alignment):** cross-modal alignment is limited by how much
+  content the paired samples actually share (caption informativeness), not by architecture or
+  geometry. Predicts that agreement concentrates on samples whose captions describe the image
+  and rises with descriptive captions.
+- **PRH as a trend:** the PRH predicts alignment that *increases* with capability; our evidence so
+  far is about levels. The trend under calibrated, max-over-layers nulls is the direct test.
+
+### Revised work packages
+
+| WP | status | change |
+|---|---|---|
+| WP0 estimator validation | done (exp-011, exp-013) | stage 2 (pairs) becomes WP8c |
+| WP1 ID mismatch | done (exp-012); pooling-corrected IDs in exp-015 | rerun the mismatch analysis on matched pooling |
+| WP2 per-sample localisation | partly done (exp-014 per-sample) | becomes WP10 |
+| WP3 distance ladder | reframed | an invariance x scale grid: cardinal (CKA, whitened CKA), ordinal (mutual kNN, Spearman RSA), per-sample local structure (ORC, density); no graph-geodesic rungs |
+| WP4 intrinsic scale | dropped | scale is studied with k (exp-014 k-sweep) |
+| WP5 invariants | reduced | ID and the flatness test; GW lower bounds and trustworthiness / continuity optional |
+| WP6 spectral | parked | only if diffusion distances pass a WP0-style test |
+| WP7 map complexity | kept, later | needs n >= 10k |
+| **WP8 positive controls and ceilings (new)** | next | (a) contrastive dual encoders (CLIP / SigLIP text vs image towers); (b) data ceilings: caption vs caption of the same image, image vs augmented image; (c) synthetic dose-response: metric value vs fraction of shared latent factors |
+| **WP9 scaling trend (new)** | next | calibrated cross-modal mutual kNN, CKA, ORC agreement vs model size / capability, max-over-layers nulls |
+| **WP10 per-sample content (new)** | next | do cross-modally aligned samples have more descriptive captions (image-text score)? |
+| **WP11 generality (new)** | later | second dataset with descriptive captions (COCO or WIT recaptions), n = 10k, current models (Llama-3, Qwen2.5, SigLIP 2, DINOv2) |
+
+### Publication plan
+
+1. **Main-track paper:** what language and vision models share: local-structure agreement (ORC,
+   density, neighbourhoods) is strong within modality and weak across, under matched pooling and
+   calibration; positive controls show the measures detect alignment when it exists (WP8); the
+   scaling trend tests the PRH (WP9); the per-sample analysis explains where models agree (WP10).
+2. **Workshop paper:** what is and is not estimable about the geometry of high-dimensional
+   representations: the synthetic benchmark of exp-011 / exp-013, graph geodesics, ORC offsets and
+   density coupling, the cube-boundary pitfall, pooling effects on ID, and the PersonaManifold
+   replication.
 
 ## Background and motivation
 
@@ -171,6 +230,8 @@ At 100k a full distance matrix takes 40 GB in float32, so those runs use sparse 
 Eight work packages: WP0 validates the tools, WP1 and WP2 are free checks on cached data, WP3 to WP7 are the main analyses. Each lists its motivation, intent, method, expected outcome and cost.
 
 ### WP0: Validate the estimators on synthetic manifolds
+**Status (2026-11-03):** done, exp-011 and exp-013 (see Revision 1).
+
 
 **Motivation.** exp-010 showed that ID estimators disagree with each other and drift with n. Curvature at ID around 25 is harder still. An incompatibility claim is only as strong as the estimators behind it.
 
@@ -190,6 +251,8 @@ Eight work packages: WP0 validates the tools, WP1 and WP2 are free checks on cac
 **Decision gate.** A measure that misclassifies the controls is dropped or reported as exploratory only.
 
 ### WP1: Does ID mismatch predict misalignment?
+**Status (2026-11-03):** done, exp-012; pooling-corrected IDs in exp-015.
+
 
 **Motivation.** In exp-010, LLM and ViT IDs move toward each other and meet at about 20-35 in late layers, which is where cross-modal alignment usually peaks. If a mismatch in dimension limits alignment, this is direct and nearly free evidence for H2.
 
@@ -209,6 +272,8 @@ Eight work packages: WP0 validates the tools, WP1 and WP2 are free checks on cac
 **Caveat.** This is correlational, and ID is a one-number summary. A positive result motivates WP5 rather than replacing it.
 
 ### WP2: Where on the manifold do models agree?
+**Status (2026-11-03):** partly done (exp-014 per-sample check); continues as WP10.
+
 
 **Motivation.** ARH says local agreement survives calibration, but not *where* it lives. If agreement concentrates in dense, flat regions, Euclidean neighbourhoods work only where the manifold is locally flat, which is the H1 or H3 story in miniature.
 
@@ -227,6 +292,8 @@ Eight work packages: WP0 validates the tools, WP1 and WP2 are free checks on cac
 **Output.** A map of which samples align, which also sets the scales studied in WP4.
 
 ### WP3: The distance ladder (core experiment)
+**Status (2026-11-03):** reframed as an invariance x scale grid without graph-geodesic rungs (exp-011: not estimable at ID 20-40).
+
 
 **Motivation.** If H1 holds, measuring with the manifold's own geometry should reveal agreement that Euclidean metrics hide. PersonaManifold's graded series of distances lets us attribute any gain to one geometric factor at a time.
 
@@ -266,6 +333,8 @@ All scores are calibrated against the permutation null. Graph rungs use k from W
 **Cost.** At n = 10240, each distance matrix is 400 MB and all-pairs graph shortest paths take minutes. A memory-optimised CPU pod (cpu3m, 8 vCPU, 64 GB) holds several models at once. The 1024 set runs on a laptop.
 
 ### WP4: Alignment at matched intrinsic scale
+**Status (2026-11-03):** dropped; geodesic radii are not estimable. Scale is studied with k (exp-014 k-sweep).
+
 
 **Motivation.** Our k-sweeps (exp-004, exp-005, exp-008) used k as the scale. But k neighbours cover a much larger part of a 20-dimensional manifold than of a 50-dimensional one, and more in sparse regions than dense ones. So the same k compares different scales in different models. PRH (global) and ARH (local) are the two ends of a single scale axis. The question is where on that axis agreement is lost, measured in each manifold's own units.
 
@@ -283,6 +352,8 @@ All scores are calibrated against the permutation null. Graph rungs use k from W
 **Cost.** A CPU pod at n = 10240; it reuses the WP3 geodesic matrices. A prime candidate for the 100k runs, since large-scale geodesics need dense sampling.
 
 ### WP5: Invariants and incompatibility tests
+**Status (2026-11-03):** reduced to ID (exp-012, exp-015) and the flatness test (exp-013); curvature values dropped; GW bounds optional.
+
 
 **Motivation.** This is the reverse direction. Instead of looking for the right ruler, we look for differences that no ruler can remove. Each invariant rules out one class of alignment (see the invariants table in the primer), so the result says *how* incompatible two models are, not just whether they differ.
 
@@ -301,6 +372,8 @@ All scores are calibrated against the permutation null. Graph rungs use k from W
 **Cost.** Parts 1-4 on a CPU pod at n = 10240. Part 5 is the most expensive and runs last, on subsamples.
 
 ### WP6: Spectral comparison (heat kernel and functional maps)
+**Status (2026-11-03):** parked until diffusion distances pass a WP0-style validation.
+
 
 **Motivation.** The Laplacian's eigenvectors are each manifold's own Fourier basis, ordered from coarse to fine. Comparing the two bases on paired samples asks, without any coordinates, which frequencies (scales) the models share. It is the cleanest mathematical form of "same manifold, wrong ruler".
 
@@ -319,6 +392,8 @@ All scores are calibrated against the permutation null. Graph rungs use k from W
 **Cost.** Cheap: a sparse eigendecomposition takes minutes at 10k nodes and stays feasible at 100k.
 
 ### WP7: How complex must the map between models be?
+**Status (2026-11-03):** kept for later (needs n >= 10k).
+
 
 **Motivation.** Invariants say what is impossible; a fitted map shows what is possible and at what cost. It is the most direct answer to "can these representations be aligned?"
 
