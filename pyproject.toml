@@ -32,6 +32,7 @@ dependencies = [
     "graphriccicurvature>=0.5.3.1",
     "pot>=0.9.7.post1",
     "personamanifold",
+    "open-clip-torch>=3.3.0",
 ]
 
 [project.optional-dependencies]
