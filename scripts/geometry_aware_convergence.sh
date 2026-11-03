@@ -15,7 +15,7 @@ VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/sha
 LLAMA7B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_7b/shard_0000.pt
 VITLARGE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_large_patch14_dinov2.lvd142m/shard_0000.pt
 
-OUT_PATH="/workspace/results/emily/mutual_knn_all_k"
+OUT_PATH="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
 # OUT_PATH="/workspace/results/emily/nc_metrics_1025_streamline"
 
 # python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH" --normalize --gw_mode "standard" --n-evecs 20
@@ -86,11 +86,15 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
 # multi-k sweep. Error bars from adjacent k, or any k/N grid, are then computed offline from the saved arrays.
 # Cost warning: the null runs P shuffles on EVERY layer pair at N=10k. Time one run before launching.
 NUM_PERMS_BIG=${NUM_PERMS_BIG:-200}
-OUT_BIG="/workspace/results/emily/mutual_knn_all_k_10k"
-# align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
-align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
-# align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG"
+OUT_BIG="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
 
+
+for n in 10 50 100 500 5000; do
+align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+align "$LLAMA7B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+done
 
 
 # Alternative (much more expensive for >3 k values): single-k runs at k matched in k/N to the 1024 runs.

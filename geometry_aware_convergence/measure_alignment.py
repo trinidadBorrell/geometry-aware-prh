@@ -90,6 +90,7 @@ def compute_alignment(
         out_dir,
         null_calibration=True, 
         precise=True,
+        n=None,
     ):
     """
     Args:
@@ -130,9 +131,9 @@ def compute_alignment(
     for i, x_fp in enumerate(x_feat_paths):
         raw_x = torch.load(x_fp, map_location="cuda:0")["feats"]
         if isinstance(raw_x, torch.Tensor):
-            x_feats = prepare_features(raw_x.float(), exact=precise)
+            x_feats = prepare_features(raw_x[:n].float(), exact=precise)
         else:
-            x_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_x]
+            x_feats = [prepare_features(layer[:n].float(), exact=precise) for layer in raw_x]
         
         # x_feats = prepare_features(torch.load(x_fp, map_location="cuda:0")["feats"].float(), exact=precise)
             
@@ -144,9 +145,9 @@ def compute_alignment(
 
             raw_y = torch.load(y_fp, map_location="cuda:0")["feats"]
             if isinstance(raw_y, torch.Tensor):
-                y_feats = prepare_features(raw_y.float(), exact=precise)
+                y_feats = prepare_features(raw_y[:n].float(), exact=precise)
             else:
-                y_feats = [prepare_features(layer.float(), exact=precise) for layer in raw_y]
+                y_feats = [prepare_features(layer[:n].float(), exact=precise) for layer in raw_y]
 
             # alignment scores: per-layer alignment scores
             alignment_scores, null_max = compute_score(
@@ -167,7 +168,7 @@ def compute_alignment(
                 x_model_name,
                 y_model_name,
                 metric,
-                topk, dist
+                topk, dist, n
             )
 
             np.save(save_path, {
@@ -196,11 +197,13 @@ def compute_alignment(
 
 
 
-def to_alignment_filename(output_dir, model_x, model_y, metric, topk, dist):
+def to_alignment_filename(output_dir, model_x, model_y, metric, topk, dist, n):
     dist_flag = f'_d{dist}' if dist > 0 else ''
+    k_flag = f'_k{topk}' if dist == 0 else ''
+    n_flag = f'_n{n}' if n is not None else ''
     save_path = os.path.join(
         output_dir,
-        f"{model_x}_{model_y}_{metric}_k{topk}{dist_flag}.npy" if ('knn' in metric or 'nd' in metric) else f"{metric}.npy"
+        f"{model_x}_{model_y}_{metric}{k_flag}{dist_flag}{n_flag}.npy"
     )
     return save_path
 
@@ -227,6 +230,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir",     type=str, default="/workspace/results/emily/alignment")
     parser.add_argument("--precise",        action="store_true")
     parser.add_argument("--force_remake",   action="store_true")
+    parser.add_argument("--n", type=int, default=None)
 
     # parser.add_argument("--null-calibrate", action="store_true")
     parser.add_argument("--num-permutations", type=int, default=200)
@@ -300,7 +304,8 @@ if __name__ == "__main__":
         args.num_permutations, 
         args.quantile, 
         args.later_layers, 
-        args.output_dir
+        args.output_dir,
+        n=args.n
     )
 
     # np.save(save_path, {
