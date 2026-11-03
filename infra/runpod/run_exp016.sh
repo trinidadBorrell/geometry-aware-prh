@@ -21,6 +21,7 @@ WORKERS=${WORKERS:-24}
 LLM_TOKENS=${LLM_TOKENS:-16384}  # tokens per LLM batch (4096 on a 32 GB GPU)
 KEEP_CACHES=${KEEP_CACHES:-6}    # alignment caches held on the GPU (2 on a 32 GB GPU)
 EXTRACT_TIMEOUT=${EXTRACT_TIMEOUT:-60m}  # per model and attempt (longer on GPUs under 32 GB)
+BATCH=${BATCH:-32}                # images / short texts per batch (8 on 24 GB: DINOv2-g runs at 518 px)
 AUTO_TERMINATE=${AUTO_TERMINATE:-0}
 mkdir -p "$OUT"
 git rev-parse HEAD > "$OUT/git_sha.txt"
@@ -43,7 +44,7 @@ print(' '.join([*m.TOWERS, *m.LLMS, *m.VITS, 'random']))")
     [ -n "$d" ] && [ -d "$HUB/$d" ] && existed=1
     for attempt in 1 2 3; do
       if timeout "$EXTRACT_TIMEOUT" uv run python "$EXP/extract.py" --out "$OUT" --d2 "$OUT/d2.parquet" \
-          --only "$m" --llm-tokens "$LLM_TOKENS" >> "$RES/exp-016-extract.log" 2>&1; then ok=0; break; fi
+          --only "$m" --llm-tokens "$LLM_TOKENS" --batch "$BATCH" >> "$RES/exp-016-extract.log" 2>&1; then ok=0; break; fi
       echo "$m: attempt $attempt failed" >> "$RES/exp-016-extract.log"
       [ -n "$d" ] && rm -rf "$HUB/$d/blobs/"*.incomplete
     done
