@@ -205,3 +205,28 @@ modalities, so this measures the scale of the data's clustering and density hete
 - Early-layer BLOOMZ and LLaMA *anti*-agree on density (-0.54 to -0.79): captions that are dense in
   one model's embedding layer are sparse in the other's, presumably from their different
   tokenizers and vocabularies.
+
+### ORC distributions and the flat-torus reference (2026-11-03)
+
+`distributions.py` (local): the full node-ORC distribution per layer (k = 10) against a flat-torus
+reference with the same n, k and ID (rounded TwoNN), computed as a distribution
+(`torus_dist_k10.json`, 48 IDs). Figures `fig4_orc_distributions_{prh,matched}` (per model:
+median and 10-90% band; reference: median and 10-90% band at each layer's ID) and
+`fig3_levels_median_{prh,matched}` (median minus reference median).
+
+- **Why this reference.** ORC's level depends strongly on n, k and the ID (exp-011). A uniformly
+  sampled flat torus T^d holds those three fixed while having zero curvature, uniform density, no
+  clusters and no boundary (a cube's boundary raises ORC; exp-011 correction). It is the
+  "nothing but dimension" baseline; deviations from it mix curvature, density heterogeneity and
+  clustering and are not curvature alone. Its TwoNN-based ID is an underestimate (exp-011), which
+  puts the reference slightly higher (less negative) than it should be, so gaps are if anything
+  understated.
+- **Median vs mean.** The first level figure (`fig3_levels`) compared the data's median with the
+  torus mean. For the torus the two agree to within 0.005 (symmetric, narrow distribution), so that
+  figure stands; the redrawn version compares medians throughout. Medians are used for the data
+  because near-identical points (duplicate or near-duplicate captions) produce extreme negative
+  values that dominate a mean.
+- **What the distributions show.** In every layer of every model, the data's 10-90% band
+  (about -0.6 to +0.1) lies entirely above the reference band (about -0.95 to -0.75): the whole
+  distribution is shifted, not a tail, and it is several times wider than for uniform sampling.
+  That per-sample spread is what the paired statistics exploit.
