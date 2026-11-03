@@ -212,6 +212,21 @@ def llm_mean(model, tokenizer, texts: list[str], max_tokens: int = 16384) -> tor
     return feats
 
 
+def load_llm_capped(name: str, gpu_gib: float):
+    """platonic-rep `load_llm` (bf16, device_map auto, hidden states) with the weights on the GPU
+    capped at `gpu_gib`, so a batch's activations fit next to them; the remaining layers run from
+    CPU memory (same numerics, slower). For a model that fills the GPU (llama-13b on 24 GB)."""
+    from transformers import AutoModelForCausalLM
+
+    return AutoModelForCausalLM.from_pretrained(
+        name,
+        device_map="auto",
+        max_memory={0: f"{gpu_gib}GiB", "cpu": "64GiB"},
+        torch_dtype=torch.bfloat16,
+        output_hidden_states=True,
+    ).eval()
+
+
 # ---------------------------------------------------------------- ViTs (B2, B3, baseline, D)
 
 
@@ -356,6 +371,9 @@ def main() -> None:
     parser.add_argument("--parts", default="towers,llms,vits,aug,random")
     parser.add_argument("--batch", type=int, default=32)
     parser.add_argument("--llm-tokens", type=int, default=16384, help="tokens per LLM batch")
+    parser.add_argument(
+        "--llm-gpu-gib", type=float, default=None, help="cap LLM weights on the GPU (GiB)"
+    )
     parser.add_argument("--only", default=None, help="one tower key, LLM, ViT or 'random'")
     parser.add_argument("--hub-dir", default=None, help="print the HF cache folder of a model")
     parser.add_argument("--check", action="store_true")
@@ -418,7 +436,8 @@ def main() -> None:
             ]
             if not todo:
                 continue
-            model, tokenizer = load_llm(name), load_tokenizer(name)
+            model = load_llm_capped(name, args.llm_gpu_gib) if args.llm_gpu_gib else load_llm(name)
+            tokenizer = load_tokenizer(name)
             assert tokenizer.padding_side == "left"
             for tag, c, texts in todo:
                 meta = {"model": name, "pool": "avg", "caption": c}
