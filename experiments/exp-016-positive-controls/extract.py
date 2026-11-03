@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import gc
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -181,7 +182,7 @@ def llm_mean(model, tokenizer, texts: list[str], max_tokens: int = 16384) -> tor
         len(t) for t in tokenizer(texts, truncation=True, max_length=MAX_LLM_TOKENS)["input_ids"]
     ]
     order = np.argsort(lengths)[::-1]
-    feats, i = [None] * len(texts), 0
+    feats, i = None, 0  # filled in place: stacking rows would double the peak memory
     with tqdm(total=len(texts), desc="llm") as bar:
         while i < len(order):
             b = max(1, min(64, max_tokens // lengths[order[i]]))
@@ -203,11 +204,12 @@ def llm_mean(model, tokenizer, texts: list[str], max_tokens: int = 16384) -> tor
             f = torch.stack(
                 [(h.float() * mask).sum(1) / mask.sum(1) for h in out["hidden_states"]], 1
             )
-            for j, row in zip(idx, f.cpu(), strict=True):
-                feats[j] = row
+            if feats is None:
+                feats = torch.empty(len(texts), *f.shape[1:])
+            feats[torch.from_numpy(idx.copy())] = f.cpu()
             i += len(idx)
             bar.update(len(idx))
-    return torch.stack(feats)
+    return feats
 
 
 # ---------------------------------------------------------------- ViTs (B2, B3, baseline, D)
@@ -237,29 +239,50 @@ def vit_cls(name: str, images: list, batch: int, device: str, pretrained: bool =
     return torch.cat(feats)
 
 
-def augment(images: list, seed: int) -> list:
+def augment(images: Sequence, seed: int) -> LazyImages:
     """The same random view of each image for a given seed (seeded per image), at the image's
     own size so the model's eval transform sees the same resolution as without augmentation."""
     from torchvision.transforms import v2
 
     jitter_flip = v2.Compose([v2.ColorJitter(0.4, 0.4, 0.4, 0.1), v2.RandomHorizontalFlip()])
-    out = []
-    for i, im in enumerate(images):
-        im = im.convert("RGB")
+
+    def view(i: int):
+        im = images[i].convert("RGB")
         torch.manual_seed(seed * 1_000_003 + i)
         crop = v2.RandomResizedCrop(size=(im.height, im.width), scale=(0.6, 1.0), antialias=True)
-        out.append(jitter_flip(crop(im)))
-    return out
+        return jitter_flip(crop(im))
+
+    return LazyImages(len(images), view)
 
 
 # ---------------------------------------------------------------- data
 
 
+class LazyImages(Sequence):
+    """Images decoded on access, so only the current batch is held decoded (all of D1 decoded
+    takes ~19 GB; a pod may have 31 GB)."""
+
+    def __init__(self, n: int, get):
+        self.n, self.get = n, get
+
+    def __len__(self) -> int:
+        return self.n
+
+    def __getitem__(self, i):
+        if isinstance(i, slice):
+            return [self.get(j) for j in range(*i.indices(self.n))]
+        return self.get(range(self.n)[i])
+
+
 def load_d1():
-    from datasets import load_dataset
+    from datasets import Image, load_dataset
 
     d = load_dataset("minhuh/prh", revision="wit_1024", split="train")
-    return [str(r[0]) for r in d["text"]], [d[i]["image"] for i in range(len(d))]
+    raw = d.cast_column("image", Image(decode=False))["image"]
+    feature = Image()  # decoded exactly as `d[i]["image"]` (incl. EXIF orientation)
+    return [str(r[0]) for r in d["text"]], LazyImages(
+        len(raw), lambda i: feature.decode_example(raw[i])
+    )
 
 
 def load_d2(path: Path, n: int):
@@ -269,7 +292,8 @@ def load_d2(path: Path, n: int):
     from PIL import Image
 
     df = pd.read_parquet(path).iloc[:n]
-    images = [Image.open(io.BytesIO(b)) for b in df["image"]]
+    blobs = df["image"].tolist()
+    images = LazyImages(len(blobs), lambda i: Image.open(io.BytesIO(blobs[i])))
     return df["caption"].tolist(), df["gemini_caption"].tolist(), images
 
 
