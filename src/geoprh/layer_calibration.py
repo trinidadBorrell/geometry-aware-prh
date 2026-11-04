@@ -59,9 +59,10 @@ def scores(a: ModelCache, b: ModelCache, perm: torch.Tensor | None = None) -> di
     n = a.masks.shape[1]
     out = {}
     for metric, xa, xb in (("mutual_knn", a.masks, b.masks), ("cka_lin", a.grams, b.grams)):
-        if perm is not None:
-            xb = xb[:, perm][:, :, perm]
-        s = xa.flatten(1) @ xb.flatten(1).T
+        if perm is None:
+            s = xa.flatten(1) @ xb.flatten(1).T
+        else:  # one layer of B permuted at a time: a full permuted copy is [Lb, n, n] (GBs)
+            s = torch.stack([xa.flatten(1) @ x[perm][:, perm].flatten() for x in xb], 1)
         out[metric] = s / (n * a.k) if metric == "mutual_knn" else s
     return out
 
