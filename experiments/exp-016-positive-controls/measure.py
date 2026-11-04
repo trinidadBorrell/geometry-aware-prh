@@ -199,6 +199,9 @@ class Caches:
         if key in self.data:
             self.data.move_to_end(key)
             return self.data[key]
+        while len(self.data) >= self.keep:  # evict before building: n = 10240 caches are ~4 GB
+            self.data.popitem(last=False)
+            torch.cuda.empty_cache()
         layers, names = prepared_layers(self.root / "features" / f"{key}.pt")
         runs = []  # consecutive layers of equal width (blocks, then the final embedding)
         for x in layers:
@@ -212,9 +215,6 @@ class Caches:
             grams=torch.cat([p.grams for p in parts]),
             k=self.k,
         )
-        while len(self.data) >= self.keep:
-            self.data.popitem(last=False)
-            torch.cuda.empty_cache()
         self.data[key] = (cache, names)
         return cache, names
 
@@ -345,6 +345,7 @@ def stage_pairs(
         if pid in done:
             continue
         tag = s["tag"]
+        ca = cb = None  # so an evicted cache of the previous pair is freed
         ca, names_a = caches.get(f"{s['a']}__{tag}")
         cb, names_b = caches.get(f"{s['b']}__{tag}")
         n = ca.masks.shape[1]
