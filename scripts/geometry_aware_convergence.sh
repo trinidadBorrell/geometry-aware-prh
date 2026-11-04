@@ -72,27 +72,27 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
     done
 }
 # mknn
-NUM_PERMS=${NUM_PERMS:-200}
-for setting in "${SETTINGS[@]}"; do
-    IFS='|' read -r x y out <<< "$setting"
-    align "$x" "$y" "$out" --metric mutual_knn_all_k --num-permutations "$NUM_PERMS" --n 10
-done
+# NUM_PERMS=${NUM_PERMS:-200}
+# for setting in "${SETTINGS[@]}"; do
+#     IFS='|' read -r x y out <<< "$setting"
+#     align "$x" "$y" "$out" --metric mutual_knn_all_k --num-permutations "$NUM_PERMS" --n 10
+# done
 
 # ---- 10k pair: k/N scaling ----
 # One all-k call returns mKNN at every k=1..N-1 (so every k/N), for every layer pair. Rank matrices are
 # computed once per call, so this costs about as much as 2-3 single-k runs and is cheaper than any
 # multi-k sweep. Error bars from adjacent k, or any k/N grid, are then computed offline from the saved arrays.
 # Cost warning: the null runs P shuffles on EVERY layer pair at N=10k. Time one run before launching.
-# NUM_PERMS_BIG=${NUM_PERMS_BIG:-200}
-# OUT_BIG="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
+NUM_PERMS_BIG=${NUM_PERMS_BIG:-200}
+OUT_BIG="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
 
 
-# for n in 10 50 100 500 5000; do
-# align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
-# align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
-# align "$LLAMA7B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
-# align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
-# done
+for n in 10 50 100 500 5000; do
+align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
+align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
+align "$LLAMA7B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
+align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
+done
 
 
 # Alternative (much more expensive for >3 k values): single-k runs at k matched in k/N to the 1024 runs.
