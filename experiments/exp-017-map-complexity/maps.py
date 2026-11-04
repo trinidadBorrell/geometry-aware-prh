@@ -441,6 +441,10 @@ def real_specs() -> list[dict]:
     s += [{"group": "W_vit", "a": x, "b": y} for x, y in itertools.combinations(VITS, 2)]
     s += [{"group": "D_random", "a": RANDOM, "b": f"{lm}__gemini"} for lm in LLMS]
     s += [{**x, "group": "D_shuffle", "shuffle": True} for x in s if x["group"] == "B3_gemini"]
+    # within-modality references at the last layer (the mutual-kNN best cell is often an early,
+    # input-level layer: LLM embeddings of the same text, early ViT blocks)
+    s += [{**x, "group": f"{x['group']}_last", "cell": ("last", "last")}
+          for x in s if x["group"] in ("W_llm", "W_vit")]  # fmt: skip
     for x in s:
         x["id"] = f"{x['group']}__{x['a']}__{x['b']}"
     return s
@@ -502,7 +506,15 @@ def cmd_real(args) -> None:
             la, na = cache.get(s["a"])
             lb, nb = cache.get(s["b"])
             if "cell" in s:
-                i, j, ov = na.index(s["cell"][0]), nb.index(s["cell"][1]), None
+
+                def pick(names, c):
+                    return (
+                        max(i for i, nm in enumerate(names) if nm != "final")
+                        if c == "last"
+                        else names.index(c)
+                    )
+
+                i, j, ov = pick(na, s["cell"][0]), pick(nb, s["cell"][1]), None
             else:
                 ln = [x for x, nm in zip(la, na, strict=True) if nm != "final"]
                 lm = [x for x, nm in zip(lb, nb, strict=True) if nm != "final"]
