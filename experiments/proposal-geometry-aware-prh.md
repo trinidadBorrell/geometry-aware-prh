@@ -22,6 +22,7 @@ measures whose invariances and biases are known, against positive controls and d
 | exp-013 | The moment curvature estimator separates intrinsically flat from curved at the true ID, but d is not recoverable at ID >= 20 and magnitudes are biased; it works only as a one-sided flatness test. A flat torus reproduces LLM-like PCA90 / ID: nonlinearity in the PCA sense is not intrinsic curvature | Curvature only as a flatness check |
 | exp-014 | Per-sample ORC agreement (rank correlation across samples) is strong within modality (0.57-0.68 after removing density; within family 0.7-0.84); ~90% survives removing neighbour overlap; its layer-pair pattern repeats mutual kNN; the data is far more locally clustered than uniform sampling up to k ~ 100 | ORC kept as a paired local-structure statistic, not as curvature |
 | exp-015 | Pooling explains the opposite LLM / ViT ID profiles (LLM last-token ID rises with depth); matched pooling does not raise cross-modal alignment (mutual kNN, CKA) or cross-modal ORC agreement (0.10-0.16 vs ~0.6 within modality) | The cross-modal gap is not a pooling or ruler artefact, as far as tested |
+| exp-016 (WP8, 2026-11-04) | Positive controls work: contrastive dual encoders reach ~2x the LLM x ViT level on WIT captions (mutual kNN 0.22 vs 0.12, ORC 0.34 vs 0.15), shuffled pairs are null. With descriptive Gemini captions, LLM x ViT rises to 0.34 / ORC 0.38 in all 16 pairs, as high as the dual encoders; ORC agreement tracks mutual kNN | The cross-modal gap was mostly caption content (H4). Run WP9 and WP10 on descriptive captions; WP11 (second captioner / dataset) rules out caption style |
 
 ### Revised hypotheses
 
@@ -31,7 +32,8 @@ measures whose invariances and biases are known, against positive controls and d
 - **H4 (new, shared content bounds alignment):** cross-modal alignment is limited by how much
   content the paired samples actually share (caption informativeness), not by architecture or
   geometry. Predicts that agreement concentrates on samples whose captions describe the image
-  and rises with descriptive captions.
+  and rises with descriptive captions. **Supported by exp-016:** descriptive captions triple LLM x ViT
+  mutual kNN and more than double ORC agreement, to the dual-encoder level.
 - **PRH as a trend:** the PRH predicts alignment that *increases* with capability; our evidence so
   far is about levels. The trend under calibrated, max-over-layers nulls is the direct test.
 
@@ -47,7 +49,7 @@ measures whose invariances and biases are known, against positive controls and d
 | WP5 invariants | reduced | ID and the flatness test; GW lower bounds and trustworthiness / continuity optional |
 | WP6 spectral | parked | only if diffusion distances pass a WP0-style test |
 | WP7 map complexity | kept, later | needs n >= 10k |
-| **WP8 positive controls and ceilings (new)** | next | (a) contrastive dual encoders (CLIP / SigLIP text vs image towers); (b) data ceilings: caption vs caption of the same image, image vs augmented image; (c) synthetic dose-response: metric value vs fraction of shared latent factors |
+| **WP8 positive controls and ceilings (new)** | done (exp-016) | (a) contrastive dual encoders (CLIP / SigLIP text vs image towers); (b) data ceilings: caption vs caption of the same image, image vs augmented image; (c) synthetic dose-response: metric value vs fraction of shared latent factors |
 | **WP9 scaling trend (new)** | next | calibrated cross-modal mutual kNN, CKA, ORC agreement vs model size / capability, max-over-layers nulls |
 | **WP10 per-sample content (new)** | next | do cross-modally aligned samples have more descriptive captions (image-text score)? |
 | **WP11 generality (new)** | later | second dataset with descriptive captions (COCO or WIT recaptions), n = 10k, current models (Llama-3, Qwen2.5, SigLIP 2, DINOv2) |
