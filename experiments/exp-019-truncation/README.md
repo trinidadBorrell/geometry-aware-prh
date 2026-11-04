@@ -1,6 +1,6 @@
 # exp-019: where in the spectrum does cross-model alignment live? (random and PCA truncation)
 
-**Status:** synthetic calibration and local pilot done (n = 1024, small models); full run on D2 pending ·
+**Status:** synthetic calibration and local pilot done (n = 1024, small models); D2 run code ready (`24e56d8`), not run: on 2026-11-04 every CPU pod create in EU-RO-1 with the volume failed for lack of capacity (cpu3c 32 / 16 vCPU, cpu5c 32 vCPU, with and without the spar-cpu template) ·
 **Owner:** oddharak · **Outputs:** `results/exp-019-truncation/{synthetic,pilot}/` (local; full run:
 `/workspace/results/oddharak/exp-019-truncation/`)
 
@@ -163,6 +163,18 @@ The current code runs as is on these.
 **Scaling to n = 10240 (`d2l`):** CKA would switch to the d × d formula and mKNN to `knn_sweep` only, because the dense n × n caches are too large. Leave that until d2s shows a caption effect.
 
 ## Commands
+
+D2 run (CPU pod, 32 vCPU, volume attached; est. 1-1.5 h; `run_exp019.sh` uses 200 permutations, 2
+draws of random coordinates, 1 of random projections, 9 layers per model, and terminates the pod
+30 min after the job ends so results can be copied):
+
+```bash
+ssh root@<ip> -p <port> 'BRANCH=oddharak bash -s' < infra/runpod/setup_pod.sh
+ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && AUTO_TERMINATE=1 nohup bash infra/runpod/run_exp019.sh > /workspace/results/oddharak/exp-019.log 2>&1 < /dev/null &"
+scp -P <port> -r root@<ip>:/workspace/results/oddharak/exp-019-truncation/d2s results/exp-019-truncation/
+```
+
+Local:
 
 ```bash
 uv run pytest tests/test_truncation.py tests/test_knn_sweep.py -q
