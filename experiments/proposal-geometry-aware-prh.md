@@ -1,8 +1,122 @@
 # Geometry-aware PRH: wrong ruler or incompatible manifolds?
 
-2026-10-17, revised 2026-11-03 (Revision 1) · oddharak · exported from the [Claude doc](https://claude.ai/code/artifact/d90b2722-a72a-407f-99db-e6f8c3725ebf); edit this copy in the repo
+2026-10-17, revised 2026-11-03 (Revision 1) and 2026-11-04 (Revision 2) · oddharak · exported from the [Claude doc](https://claude.ai/code/artifact/d90b2722-a72a-407f-99db-e6f8c3725ebf); edit this copy in the repo
 
 We propose eight work packages that test whether the Platonic and Aristotelian hypotheses disagree because Euclidean metrics are the wrong ruler for curved representations (H1), or because the representation manifolds are intrinsically incompatible (H2). The plan starts with free checks on cached data and puts confound-free intra-LLM comparisons first; cross-modal LLM-ViT results are read against them until comparable extractions exist.
+
+## Revision 2 (2026-11-04): after exp-016 and the 2026 literature
+
+### What changed
+
+exp-016 showed that with descriptive (Gemini) captions, LLM x ViT agreement rises in all 16 pairs
+(mutual kNN 0.12 -> 0.34, CKA 0.25 -> 0.58, ORC given density 0.15 -> 0.38 above null), to the level
+of CLIP / SigLIP and below the within-modality level (~0.5). A literature check then showed that
+this headline is largely known:
+
+- **Back into Plato's Cave** (Koepke, Zverev, Ginosar, Efros, arXiv 2604.18572, April 2026) made the
+  recaptions we used (gemini-3-flash-preview, ~500 words, image only, "describe what you see").
+  Mutual kNN at fixed k collapses with n (1k -> 15M pairs: 0.135 -> 0.008); detailed captions raise
+  alignment but saturate at 100-250 words, far below unimodal levels. They read this as an
+  *organisational* gap: models share coarse structure but live in separate "Umwelten".
+- **Herbst, Roschmann, Bouniot, Akata** (NeurIPS 2026 workshop): unimodal models' cross-modal
+  alignment can reach or exceed explicitly aligned vision-language models but stays behind
+  same-modality alignment; the capability trend persists when captions are clean and informative.
+- **Gröger, Wen, Brbić** (the Aristotelian paper, ICML 2026): after calibration, global convergence
+  largely disappears; local neighbourhood agreement remains.
+- **Bangachev, Bresler, Polyanskiy** (arXiv 2605.28870): alignment as signal (linear object-attribute
+  features), bias and noise; sparse linear features align better across modalities than dense ones.
+- Earlier: the PRH paper's own caption-density result (DCI); Tjandrasuwita et al. (ICML 2025,
+  alignment depends on redundant vs unique information); JAM (arXiv 2507.01201, shared and
+  modality-specific autoencoders on frozen embeddings); Dhimoïla et al. (ICLR 2026, sparse bimodal
+  atoms carry the cross-modal signal).
+
+What is *not* settled: why cross-modal agreement stays below the within-modality level and
+collapses with n. Plato's Cave reads both as organisational (models arrange shared content
+differently). The alternative is that shared content is arranged alike, and the gap is
+modality-private variance measured against the wrong ceiling. No paper separates the two. That
+becomes the paper, and it is the plan's original "wrong ruler" question asked precisely.
+
+### What exp-016 adds that the literature does not
+
+1. **Private variance alone reproduces the gap** (arm C): two encoders of fully shared content plus
+   36-50% private variance give mutual kNN 0.1-0.2, ORC agreement near null and CKA 0.5-0.7, the
+   same "below the ceiling" pattern that is read as organisational.
+2. **Within-modality bands contain shared modality-specific content:** a randomly initialised ViT
+   against a pretrained ViT reaches mutual kNN 0.16-0.23 and CKA 0.50-0.66 from pixel statistics
+   alone. Two ViTs share image detail that no caption carries, so the unimodal band overstates the
+   attainable cross-modal level.
+3. **Models trained to align also sit below the band:** CLIP / SigLIP text x image reach 0.22-0.30
+   against ~0.5 within modality, so being below the unimodal band is not evidence against
+   convergence. Caveat: CLIP reads only the first 77 tokens, 12.5% of a Gemini caption.
+4. **The text side's own instance noise is large:** one LLM on the original and the Gemini caption
+   of the same image (B1) agrees less (0.16) than that LLM's Gemini-caption representation agrees
+   with a ViT (0.34).
+
+### Revised question and hypotheses
+
+When language and vision models disagree, is it because they encode different content
+(*informational*: what the paired samples share, and what each modality adds privately) or because
+they arrange shared content differently (*organisational*)? The full-space Euclidean ruler mixes
+shared and private variance; the ruler that isolates organisation is the shared subspace.
+
+- **H5 (private variance):** in the cross-validated shared subspace, LLM and ViT neighbourhoods
+  agree up to the instance-noise ceiling (H7); full-space gaps, and the collapse with n at fixed k,
+  follow from private variance.
+- **H6 (organisational gap, as Plato's Cave):** agreement stays low inside the shared subspace too.
+- **H7 (ceiling):** the attainable cross-modal level is set by instance noise (two captions of one
+  image, two views of one scene), not by two models seeing the same input.
+
+### Experiments, ordered by evidence value
+
+| | experiment | what decides it | compute |
+|---|---|---|---|
+| **E1** | **Identifiability on synthetic data.** Arm C with three knobs: shared fraction, private variance, *organisation* (an information-preserving warp of the shared latent in one model: anisotropic scaling, monotone per-coordinate warps, a random invertible MLP). Sweep n from 1k to 100k, k fixed and k proportional to n | (a) private variance alone gives cross < within and a fixed-k collapse with n; (b) a warp gives a different signature; (c) the E3 decomposition tells the knobs apart. If (a) fails, Plato's Cave's collapse supports H6 | CPU, days |
+| **E2** | **Caption validity.** Same images, several caption sources: human dense captions (DOCCI ~15k images ~136 words; DCI dense + summaries; COCO val with 5 short captions each; Localized Narratives); open VLM captioners with known vision towers (LLaVA-1.5 -> CLIP ViT-L/14-336, PaliGemma 2 -> SigLIP-So400m, Qwen2.5-VL, InternVL) on WIT 10k at several lengths; *blind elaboration*: a text-only LLM expands the original WIT caption to Gemini length without the image | Human dense ~ Gemini: the gain is content. Blind elaboration ~ original: not style or length. *Leakage test:* is LLM(caption) most aligned with the ViT inside the captioner? | GPU, ~1 day |
+| **E3** | **Shared-subspace decomposition (core).** 5-fold split of pairs; fit a shared subspace on the fit split (ridge CCA / reduced-rank regression after PCA to 256 dimensions; a small MLP probe for the nonlinear case, absorbing WP7). On held-out samples: predictive alignment both ways (R^2, retrieval), shared fraction of each model's variance, and mutual kNN / ORC / density / RSA agreement in the shared subspace, the full space and the private residual. Same for dual encoders, ViT x ViT, LLM x LLM, augmentations, random-init; null: subspaces fit on shuffled pairs | H5: shared-subspace agreement approaches the E5 ceiling, and residuals carry modality-specific structure (low-level image statistics for ViTs; lexical and entity content for LLMs). H6: shared-subspace agreement stays near full-space values | GPU extraction at n = 10k-100k (WIT-1M recap), then CPU |
+| **E4** | **Scale of measurement.** n = 1k, 10k, 100k; k fixed and k/n fixed; full space vs shared subspace | H5: the fixed-k collapse with n is strong in the full space and much weaker in the shared subspace. Answers Plato's Cave's main result directly | with E3 |
+| **E5** | **Instance-noise ceilings** (as noise ceilings in neuroscience RSA). Text: one LLM on two independent captions of an image (COCO's 5, DOCCI vs Gemini, DCI summary vs dense). Image: one ViT on two views. Compare cross-modal agreement with sqrt(text ceiling x image ceiling) | H7: cross-modal agreement with descriptive captions is a large fraction of this ceiling; two-model unimodal bands lie above it by the shared modality-specific content (random-init floor) | GPU, small |
+| **E6** | **Fair positive control:** long-text dual encoders (Long-CLIP-L, 248 tokens; jina-clip-v2; LLM2CLIP), and LLMs on captions truncated to 77 tokens | Whether "LLM x ViT matches dual encoders" survives equal caption input | GPU, small |
+| E7 | Per-sample (old WP10): which samples agree, in which subspace; caption-image grounding score; image type (photo, map, diagram) | Where shared content lives | CPU |
+| E8 | Scaling trend, decomposed (old WP9, later): with descriptive captions and E3, does capability raise the shared fraction, the shared-subspace agreement, or both? Qwen2.5 0.5-72B, Llama-3.x 1-70B, DINOv2 S-g, SigLIP 2 sizes | Herbst et al. report that the trend persists; this says what grows | GPU, large |
+
+### Work packages after Revision 2
+
+| old WP | now |
+|---|---|
+| WP0, WP1, WP8 | done (exp-011 to exp-016); WP8 extended by E5 and E6 |
+| WP2 / WP10 per-sample | E7 |
+| WP3 invariance x scale grid | inside E3 / E4 (cardinal, ordinal and local measures per subspace) |
+| WP5 invariants | ID of the shared and private parts in E3; GW dropped |
+| WP7 map complexity | E3 (linear vs nonlinear shared maps) |
+| WP9 scaling trend | E8 |
+| WP11 generality | E2 |
+| WP4, WP6 | dropped / parked |
+
+### Paper
+
+Working title: *Shared content, private detail: informational and organisational sources of
+cross-modal (mis)alignment.* If H5 holds, the claims are: (1) the measures and nulls are validated
+by positive and negative controls and a dose-response; (2) the gap below the unimodal band and the
+collapse with n are predicted by private variance with identical organisation, and the unimodal band
+is the wrong ceiling; (3) on real data, LLMs and ViTs agree inside the shared subspace up to the
+instance-noise ceiling, robust to captioner, human captions and n; (4) this reconciles Plato's Cave
+(full-space, fixed-k fine structure is private) with the Aristotelian finding (local agreement
+survives). If H6 holds, the paper is the first controlled measurement of an organisational gap,
+which is also publishable.
+
+Target: ICML 2027 main track (deadline usually late January, ~12 weeks), fallback a 2027
+representational-alignment workshop or NeurIPS 2027. Order: E1 (local, about a week), then E2 and E6
+extraction on a GPU while the E3 method is built on the cached n = 10k features, then E3 / E4 / E5,
+then E7; E8 only with time left.
+
+### Risks
+
+- Herbst et al.'s full paper may already contain parts of E5 / E6: read it before starting E5.
+- A fitted shared subspace can create agreement: strictly held-out evaluation, shuffled-fit nulls,
+  and validation on E1 where the answer is known.
+- If captioner leakage explains much of the Gemini gain, the human-caption datasets carry the claim.
+- Many-to-many pairs (Plato's Cave): WIT-1M is deduplicated by perceptual hash and caption; COCO's 5
+  captions per image turn many-to-many into a measured ceiling (E5) instead of a confound.
 
 ## Revision 1 (2026-11-03): what we learned and what changes
 
