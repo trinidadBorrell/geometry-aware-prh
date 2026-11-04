@@ -87,11 +87,11 @@ NUM_PERMS_BIG=${NUM_PERMS_BIG:-200}
 OUT_BIG="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
 
 
-for n in 10 50 100 500 5000; do
-align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
-align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
-align "$LLAMA7B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
-align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n 10
+for n in 50 100 500 5000; do
+align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+align "$LLAMA7B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
 done
 
 
