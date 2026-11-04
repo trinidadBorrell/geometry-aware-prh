@@ -38,8 +38,17 @@ def excess(row: dict, m: str, which: str = "best") -> float:
 
 
 def threshold(row: dict, m: str, which: str = "best") -> float:
+    """Null 95% threshold as an excess. The best cell is a maximum over all layer pairs, so it is
+    compared with the null of the maximum (Algorithm 2), not with its own cell's null."""
     c = row.get(m, {}).get(which)
-    return np.nan if c is None else c["tau"] - c["mu0"]
+    if c is None:
+        return np.nan
+    return (row[m]["max_tau"] if which == "best" else c["tau"]) - c["mu0"]
+
+
+def n_sig(sub: list[dict], m: str) -> str:
+    v = [r[m]["max_p"] < 0.05 for r in sub if m in r]
+    return f"{sum(v)}/{len(v)}"
 
 
 def short(name: str) -> str:
@@ -59,21 +68,23 @@ def fmt(v: np.ndarray) -> str:
 
 def group_table(rows: list[dict]) -> list[str]:
     out = [
-        "| group | data | pairs | sig. (max-over-layers) | "
-        + " | ".join(t for _, t in MEASURES)
-        + " |",
-        "|---|---|---|---|" + "---|" * len(MEASURES),
+        "| group | data | pairs | " + " | ".join(t for _, t in MEASURES) + " |",
+        "|---|---|---|" + "---|" * len(MEASURES),
     ]
     for g in GROUPS:
         for tag in TAGS:
             sub = [r for r in rows if r["group"] == g and r["tag"] == tag]
             if not sub:
                 continue
-            sig = sum(r["mutual_knn"]["max_p"] < 0.05 for r in sub)
-            cells = [fmt(np.array([excess(r, m) for r in sub])) for m, _ in MEASURES]
-            out.append(
-                f"| {g} | {tag} | {len(sub)} | {sig}/{len(sub)} | " + " | ".join(cells) + " |"
-            )
+            cells = []
+            for m, _ in MEASURES:
+                v = np.array([excess(r, m) for r in sub])
+                if not np.isfinite(v).any():
+                    cells.append("-")
+                    continue
+                null = np.nanmedian([threshold(r, m) for r in sub])
+                cells.append(f"{fmt(v)} ({n_sig(sub, m)}; null {null:.3f})")
+            out.append(f"| {g} | {tag} | {len(sub)} | " + " | ".join(cells) + " |")
     return out
 
 
@@ -190,7 +201,7 @@ def fig_groups(rows: list[dict], out: Path) -> None:
     axes[-1].set_xticks(x, [f"{g}\n{t}" for g, t in labels], fontsize=7, rotation=90)
     fig.suptitle(
         "exp-016: best layer pair per pair of models (dots; bar = min..max, line = median)\n"
-        "grey = null 95% threshold (min..max over pairs); diamonds = final embeddings",
+        "grey = null 95% threshold of the max over layer pairs (min..max); diamonds = final embeddings",
         fontsize=9,
     )
     fig.tight_layout()
@@ -253,7 +264,8 @@ def main() -> None:
         f"# exp-016 summary ({len(rows)} pairs)",
         "",
         "Excess over the permutation null (score - mu0) at the best layer pair: median [min, max] "
-        "over the group's pairs. sig.: max-over-layers test, mutual kNN, p < 0.05.",
+        "over the group's pairs; in brackets: pairs significant under the max-over-layers test "
+        "(Algorithm 2, p < 0.05) and the median null 95% threshold of that maximum, as an excess.",
         "",
         *group_table(rows),
         "",
