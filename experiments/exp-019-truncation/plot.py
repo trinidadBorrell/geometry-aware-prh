@@ -37,6 +37,17 @@ OP_LABEL = {
 METRICS = {"mutual_knn": "mutual kNN (k = 10)", "cka_lin": "linear CKA"}
 # fixed categorical order (reference palette slots 1-4), never cycled
 COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"]
+# colour follows the group family (the caption variant is the figure, not the colour)
+FAMILY_SLOT = {"X": 0, "B3": 0, "W_llm": 1, "W_vit": 2, "D_shuffle": 3, "A": 4, "B1": 5}
+D2_SETS = {
+    "orig": ["B3_orig", "W_llm_orig", "W_vit", "A_orig", "D_shuffle"],
+    "gemini": ["B3_gemini", "W_llm_gemini", "W_vit", "A_gemini", "B1", "D_shuffle"],
+}
+
+
+def color(group: str) -> str:
+    fam = group if group in FAMILY_SLOT else group.rsplit("_", 1)[0]
+    return COLORS[FAMILY_SLOT.get(fam, 0)]
 
 
 def load(root: Path):
@@ -106,14 +117,14 @@ def _band(ax, xs, ys, color, label, ls="-"):
     ax.plot(xs, mean, ls, color=color, lw=2, marker="o", ms=3, label=label)
 
 
-def figure(cur, groups, out: Path, which: str) -> None:
+def figure(cur, groups, out: Path, which: str, tag: str = "") -> None:
     fig, axes = plt.subplots(
         len(METRICS), len(OPS), figsize=(4 * len(OPS), 3.2 * len(METRICS)), sharex="col"
     )
     for r, met in enumerate(METRICS):
         for c, op in enumerate(OPS):
             ax = axes[r, c]
-            for gi, g in enumerate(groups):
+            for g in groups:
                 pairs = cur.get((g, met, op))
                 if not pairs or (which == "retention" and g == "D_shuffle"):
                     continue
@@ -122,13 +133,13 @@ def figure(cur, groups, out: Path, which: str) -> None:
                 )
                 xs = [_xpos(op, m) for m in ms]
                 idx = 0 if which == "excess" else 1
-                _band(ax, xs, [[pairs[p][m][idx] for m in ms] for p in pairs], COLORS[gi], g)
+                _band(ax, xs, [[pairs[p][m][idx] for m in ms] for p in pairs], color(g), g)
                 if which == "retention":
                     _band(
                         ax,
                         xs,
                         [[pairs[p][m][2] for m in ms] for p in pairs],
-                        COLORS[gi],
+                        color(g),
                         f"{g} self",
                         ls="--",
                     )
@@ -149,8 +160,8 @@ def figure(cur, groups, out: Path, which: str) -> None:
                 )
     axes[0, 0].legend(fontsize=7, frameon=False, ncol=2 if which == "retention" else 1)
     fig.tight_layout()
-    fig.savefig(out / f"fig_{which}.png", dpi=150)
-    fig.savefig(out / f"fig_{which}.pdf")
+    fig.savefig(out / f"fig_{which}{tag}.png", dpi=150)
+    fig.savefig(out / f"fig_{which}{tag}.pdf")
     plt.close(fig)
 
 
@@ -204,8 +215,13 @@ def main() -> None:
     rows, selfrows = load(root)
     groups = list(dict.fromkeys(r["group"] for r in rows))
     cur = curves(rows, selfrows)
-    figure(cur, groups, root, "excess")
-    figure(cur, groups, root, "retention")
+    if len(groups) <= len(COLORS):
+        sets = {"": groups}
+    else:
+        sets = {f"_{k}": [g for g in v if g in groups] for k, v in D2_SETS.items()}
+    for tag, gs in sets.items():
+        figure(cur, gs, root, "excess", tag)
+        figure(cur, gs, root, "retention", tag)
     summary(rows, cur, groups, root)
 
 

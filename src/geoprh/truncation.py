@@ -157,6 +157,9 @@ def _calibrate(observed: dict, nulls: dict, alpha: float) -> dict:
         )
         out[m] = {**cells, **{f"max_{k}": float(v) for k, v in mx.items()}}
         out[m]["max_cell"] = [int(i) for i in divmod(int(obs.argmax()), obs.shape[1])]
+        # per-permutation max over cells: the same permutations at every setting, so the max
+        # over settings of these is the null of a max over truncation sizes too
+        out[m]["null_max"] = null.flatten(1).max(1).values
     return out
 
 
@@ -184,23 +187,24 @@ def calibrated_pairs(
     by_b: dict[str, list[str]] = {}
     for a, b in pairs:
         by_b.setdefault(b, []).append(a)
-    for s in range(0, perms.shape[0], chunk):
-        pc = perms[s : s + chunk]
-        for b, alist in by_b.items():
-            g = caches[b].dense.grams
-            stack = torch.stack([g[:, p][:, :, p].flatten(1) for p in pc])  # [Pc, Lb, n^2]
-            flat = stack.flatten(0, 1)
-            for a in alist:
-                A = caches[a]
-                cka = (
-                    (flat @ A.dense.grams.flatten(1).T)
-                    .view(len(pc), g.shape[0], -1)
-                    .transpose(1, 2)
-                )
-                knn = torch.stack([ks.scores(A.sweep, caches[b].sweep, [k], p)[0] for p in pc])
-                nulls[(a, b)]["cka_lin"].append(cka)
+    n = perms.shape[1]
+    for b, alist in by_b.items():
+        g = caches[b].dense.grams.flatten(1)  # [Lb, n^2]
+        lb = g.shape[0]
+        fa = torch.cat([caches[a].dense.grams.flatten(1) for a in alist])  # [sum La, n^2]
+        sizes = [caches[a].dense.grams.shape[0] for a in alist]
+        for s in range(0, perms.shape[0], chunk):
+            pc = perms[s : s + chunk]
+            # B[p][:, p] for every layer at once: element (i, j) is B[p_i, p_j]
+            idx = (pc[:, :, None] * n + pc[:, None, :]).flatten(1)  # [Pc, n^2]
+            stack = torch.stack([g[:, i] for i in idx])  # [Pc, Lb, n^2]
+            res = (stack.flatten(0, 1) @ fa.T).view(len(pc), lb, -1).transpose(1, 2)
+            for a, part in zip(alist, res.split(sizes, dim=1), strict=True):
+                nulls[(a, b)]["cka_lin"].append(part)
+                sweep_a, sweep_b = caches[a].sweep, caches[b].sweep
+                knn = torch.stack([ks.scores(sweep_a, sweep_b, [k], p)[0] for p in pc])
                 nulls[(a, b)]["mutual_knn"].append(knn)
-            del stack, flat
+            del stack, res, idx
     return {pair: _calibrate(observed[pair], nulls[pair], alpha) for pair in pairs}
 
 
