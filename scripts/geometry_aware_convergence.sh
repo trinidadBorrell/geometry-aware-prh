@@ -15,7 +15,12 @@ VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/sha
 LLAMA7B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_7b/shard_0000.pt
 VITLARGE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_large_patch14_dinov2.lvd142m/shard_0000.pt
 
-OUT_PATH="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
+OUT_PATH="/workspace/results/emily/mutual_knn_all_k_model_type_ablation"
+
+NUM_PERMS=${NUM_PERMS:-200}
+
+python measure_alignment.py --modality_x language --modality_y vision  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS" --output_dir "$OUT_PATH"
+
 # OUT_PATH="/workspace/results/emily/nc_metrics_1025_streamline"
 
 # python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH" --input_file_y "$VITBASE_PATH" --output_dir "$OUT_PATH" --normalize --gw_mode "standard" --n-evecs 20
@@ -48,29 +53,29 @@ OUT_PATH="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
 # VITLARGE=vit_large_patch14_dinov2.lvd142m
 
 # # "x_file|y_file|output_dir" per dataset
-SETTINGS=(
-    "$LLAMA3B_PATH|$VITBASE_PATH|$OUT_PATH"
-    "$LLAMA3B_PATH|$VITLARGE_PATH|$OUT_PATH"
-    "$LLAMA7B_PATH|$VITBASE_PATH|$OUT_PATH"
-    "$LLAMA7B_PATH|$VITLARGE_PATH|$OUT_PATH"
-    # 10k pair: all-k + null on every layer pair is very expensive at this N; enable only deliberately
-    # "$LLAMA3B_PATH_BIG|$VITBASE_PATH_BIG|$OUT_PATH"
-)
+# SETTINGS=(
+#     "$LLAMA3B_PATH|$VITBASE_PATH|$OUT_PATH"
+#     "$LLAMA3B_PATH|$VITLARGE_PATH|$OUT_PATH"
+#     "$LLAMA7B_PATH|$VITBASE_PATH|$OUT_PATH"
+#     "$LLAMA7B_PATH|$VITLARGE_PATH|$OUT_PATH"
+#     # 10k pair: all-k + null on every layer pair is very expensive at this N; enable only deliberately
+#     # "$LLAMA3B_PATH_BIG|$VITBASE_PATH_BIG|$OUT_PATH"
+# )
 
-align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
-    local x=$1 y=$2 out=$3; shift 3
-    python measure_alignment.py --input_file_x "$x" --input_file_y "$y" --output_dir "$out" "$@"
-}
+# align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
+#     local x=$1 y=$2 out=$3; shift 3
+#     python measure_alignment.py --input_file_x "$x" --input_file_y "$y" --output_dir "$out" "$@"
+# }
 
-sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datasets)
-    local metric=$1 flag=$2; shift 2
-    for v in "$@"; do
-        for setting in "${SETTINGS[@]}"; do
-            IFS='|' read -r x y out <<< "$setting"
-            align "$x" "$y" "$out" --metric "$metric" "$flag" "$v"
-        done
-    done
-}
+# sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datasets)
+#     local metric=$1 flag=$2; shift 2
+#     for v in "$@"; do
+#         for setting in "${SETTINGS[@]}"; do
+#             IFS='|' read -r x y out <<< "$setting"
+#             align "$x" "$y" "$out" --metric "$metric" "$flag" "$v"
+#         done
+#     done
+# }
 # mknn
 # NUM_PERMS=${NUM_PERMS:-200}
 # for setting in "${SETTINGS[@]}"; do
@@ -83,16 +88,16 @@ sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datas
 # computed once per call, so this costs about as much as 2-3 single-k runs and is cheaper than any
 # multi-k sweep. Error bars from adjacent k, or any k/N grid, are then computed offline from the saved arrays.
 # Cost warning: the null runs P shuffles on EVERY layer pair at N=10k. Time one run before launching.
-NUM_PERMS_BIG=${NUM_PERMS_BIG:-200}
-OUT_BIG="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
+# NUM_PERMS_BIG=${NUM_PERMS_BIG:-200}
+# OUT_BIG="/workspace/results/emily/mutual_knn_all_k_sample_size_ablation"
 
 
-for n in 50 100 500 5000; do
-align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
-align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
-align "$LLAMA7B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
-align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
-done
+# for n in 50 100 500 5000; do
+# align "$LLAMA3B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+# align "$LLAMA3B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+# align "$LLAMA7B_PATH_BIG" "$VITBASE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+# align "$LLAMA7B_PATH_BIG" "$VITLARGE_PATH_BIG" "$OUT_BIG"  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS_BIG" --n "$n"
+# done
 
 
 # Alternative (much more expensive for >3 k values): single-k runs at k matched in k/N to the 1024 runs.
