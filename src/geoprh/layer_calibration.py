@@ -47,11 +47,14 @@ def build_cache(feats: torch.Tensor, k: int = 10) -> ModelCache:
     """feats: [n, L, d] PRH-prepared features (any device)."""
     _, masks = build_knn_cache(feats, topk=k, normalize=True)
     masks = torch.stack([m.float() for m in masks])
-    grams = torch.stack(build_gram_cache(feats, normalize=True, kernel="linear")).float()
-    grams = grams - grams.mean(dim=1, keepdim=True)
-    grams = grams - grams.mean(dim=2, keepdim=True)  # H K H
-    grams = grams / grams.flatten(1).norm(dim=1).view(-1, 1, 1)
-    return ModelCache(masks=masks, grams=grams, k=k)
+    grams = []
+    for gram in build_gram_cache(feats, normalize=True, kernel="linear"):
+        # float64: float32 means and norms over n^2 entries drift on the CPU (CKA +2.3% at n = 10240)
+        c = gram.double()
+        c = c - c.mean(dim=0, keepdim=True)
+        c = c - c.mean(dim=1, keepdim=True)  # H K H
+        grams.append((c / c.norm()).float())
+    return ModelCache(masks=masks, grams=torch.stack(grams), k=k)
 
 
 def scores(a: ModelCache, b: ModelCache, perm: torch.Tensor | None = None) -> dict:
