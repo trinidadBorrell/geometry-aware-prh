@@ -117,17 +117,23 @@ def _batches(lengths: list[int], budget: int):
 @torch.no_grad()
 def mean_pooled(dec, tok, texts: list[str], budget: int) -> torch.Tensor:
     """[n, L + 1, d] float32: every hidden state, mean over the caption's tokens."""
-    device = next(dec.parameters()).device
     ids = tok(texts, truncation=True, max_length=MAX_TOKENS, add_special_tokens=False)["input_ids"]
+    return mean_pooled_ids(dec, tok, ids, budget)
+
+
+@torch.no_grad()
+def mean_pooled_ids(dec, tok, ids: list[list[int]], budget: int) -> torch.Tensor:
+    """`mean_pooled` of captions that are already token ids (exp-022: shuffled tokens)."""
+    device = next(dec.parameters()).device
     feats = None
-    with tqdm(total=len(texts), desc="features") as bar:
+    with tqdm(total=len(ids), desc="features") as bar:
         for idx in _batches([len(x) for x in ids], budget):
             batch = tok.pad({"input_ids": [ids[j] for j in idx]}, return_tensors="pt").to(device)
             out = dec(**batch, output_hidden_states=True)
             mask = batch["attention_mask"].unsqueeze(-1).float()
             f = torch.stack([(h.float() * mask).sum(1) / mask.sum(1) for h in out.hidden_states], 1)
             if feats is None:
-                feats = torch.empty(len(texts), *f.shape[1:])
+                feats = torch.empty(len(ids), *f.shape[1:])
             feats[torch.from_numpy(idx.copy())] = f.cpu()
             bar.update(len(idx))
     return feats

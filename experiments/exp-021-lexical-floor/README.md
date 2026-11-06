@@ -2,6 +2,8 @@
 
 **Status:** done, 2026-11-05; being checked in [exp-022](../exp-022-lexical-validation/README.md) · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-021-lexical-floor/` (copy in local `results/exp-021-lexical-floor/`) · **Code:** `run.py` at `aac9fdf` plus this uncommitted folder; the exact script is saved as `run.py.txt` with the outputs.
 
+> **Corrections from [exp-022](../exp-022-lexical-validation/README.md):** CKA values above about 0.5 in this README are too low, from a float32 product on the CPU. TF x pythia-1.4b is 0.712, not 0.691, so that prediction holds. Real layer 0 x TF is 0.959-0.968, not 0.91, and Gaussian tables are not below real ones on pythia-1.4b. The claim that word overlap is flat at large k holds only for linear TF-IDF and is retracted, and best-cell CKA against DINOv2 is a mid-layer value.
+
 ## Idea
 
 exp-018 found that a random-init Pythia, at layer 0 and mean-pooled, already reaches half of its final alignment with vision models. That layer is a random projection of each caption's token counts. So we score the token counts directly, with no network, on the same n = 10240 images. We also read the per-layer grids stored by exp-018 to separate the embedding table from the deep layers.
