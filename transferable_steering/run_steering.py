@@ -15,7 +15,7 @@ from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
  
 
-MODEL_A = "meta-llama/Meta-Llama-3-8B"  # Model A
+MODEL_A = "meta-llama/Meta-Llama-3.1-8B"  # Model A
 MODEL_B = "Qwen/Qwen3-8B-Base" # Model B
 LAYER_FRAC = 0.875
 
