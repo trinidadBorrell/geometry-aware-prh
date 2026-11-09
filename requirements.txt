@@ -69,3 +69,4 @@ accelerate
 sentencepiece
 protobuf
 hf_transfer
+sklearn
