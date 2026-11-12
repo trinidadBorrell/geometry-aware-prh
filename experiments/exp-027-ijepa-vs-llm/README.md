@@ -42,6 +42,11 @@ All numbers are excess over the null: the exact null mean on D2, and the mean of
   - LLM ≈ 2.55 x floor − 0.007; the ratio LLM / floor spans 2.1-2.7;
   - residuals: I-JEPA −0.003, MAE +0.007, CLIP-H +0.012 (the largest, as expected for a text-supervised tower).
   - CKA is weaker: Spearman 0.69, R² 0.51.
+- **Within vs between families.**
+  - mutual 10-NN: between the 6 family means r = 0.98; within families (family means removed) r = 0.91.
+  - The within-family part rests mostly on AugReg-tiny vs its larger siblings and on the CLIP sizes. Within DINOv2, MAE and CLIP-ft the floors differ by only 0.001-0.002, too little to resolve an order (family Spearman −1.0 to 0.5 there).
+  - CKA: the relation exists only between families (within-family r −0.06).
+  - Each of the 10 LLMs on its own ranks the ViTs like the floor (Spearman 0.93-0.97).
 - **What this says about PRH's vision side.** Across ViTs, alignment with LLMs is mostly how much word-describable structure a ViT encodes, scaled by a near-constant factor. This extends exp-023's observation that the TF-IDF floor rises with ViT size in every family.
 
 ### 2. Where it happens: MAE loses nameable content in its last blocks

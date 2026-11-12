@@ -65,6 +65,17 @@ On all 10240 images (best cell, Gemini, CLIP), W also beats trained LLM layer 0 
 - **Few models.** 4 LLMs and 2 ViTs, one image set.
 - **Nystrom oddity.** N gets worse from 10k to 20k anchors on Gemini (-0.03 at k = 1000), not explored.
 
+### Update from exp-029 (2026-11-13)
+
+The in-domain caveat matters, and in opposite directions for the two caption sets ([exp-029](../exp-029-ood-word-vectors/README.md)):
+
+- **Original captions:** word vectors from general text (Wikipedia, 55M tokens) close *more* than same-type captions, 69-79% at k = 1000 and in CKA. The claim stands without the caveat.
+- **Gemini captions:** general text closes about nothing (−59% to +16%). The 84-92% above is caption-specific: the generator's own caption statistics reproduce the LLMs' gain, and general word similarity does not.
+
+### Decision (2026-11-12)
+
+The spectral (caption-graph eigenmap) line is dropped. It failed its own prediction (S1), was the costliest part, and adds no concept beyond distributional word similarity. W is kept as a second floor: report F, then W, then the LLMs. Its in-domain caveat is tested in [exp-029](../exp-029-ood-word-vectors/README.md).
+
 ## Idea
 
 The lexical floor so far is a word kernel used directly: TF-IDF cosine between captions (exp-021 to exp-026). A spectral learner given the same kernel as its similarity graph would not return the kernel. It would return the kernel's top eigenvectors.
