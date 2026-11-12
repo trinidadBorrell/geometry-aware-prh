@@ -1,6 +1,40 @@
 # exp-018: when does a language model's alignment with vision emerge during pretraining? (pilot)
 
-**Status:** code ready, not run · **Owner:** oddharak · **Outputs (planned):** `/workspace/results/oddharak/exp-018-alignment-emergence/`
+**Status:** pilot done (Gemini captions only), 2026-11-05, git `3fc04e1` · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-018-alignment-emergence/` (summary, curves and figures also in local `results/exp-018-alignment-emergence/`)
+
+## Results (pilot, 2026-11-05)
+
+Run: 4 series x 14 checkpoints, Gemini captions only (volume space), 336 pairs, 200 permutations, RTX PRO 4500, self-terminated with exit 0. All numbers are calibrated excess at the best cell, n = 10240 unless stated.
+
+1. **Seeds agree.** Every curve of the `-seed1` replica lies within ~0.01 of the original. Seed spread is far below the change over training.
+2. **Step 0 is already half way.** A random-init Pythia, mean-pooled, already gives CKA 0.39 against DINOv2-g and 0.67 against pythia-1.4b, and mutual kNN at k = 10 gives 0.10-0.11 against the ViTs. Training roughly doubles the cross-modal values: final mutual kNN at k = 10 is 0.19-0.22 and CKA 0.53-0.70.
+3. **One sharp transition, then saturation.** Flat up to step 256 (0.5B tokens). Almost all of the change happens between steps 512 and 4000 (1B-8B tokens). After ~10B tokens the curves change little. This supports H-early-saturation (like brain alignment, AlKhamissi et al.) over H-world-knowledge.
+   - **Caveat:** the transition coincides with Pythia's LR warmup (the first 1% of training, 1430 steps, about 3B tokens).
+4. **Late decline of cross-modal alignment at 160M only.** pythia-160m x ViT mutual kNN at k = 10 peaks at 67-130B tokens and then falls by ~10% by the final step (0.218 to 0.199 for DINOv2; the same in the seed replica and for CLIP). The 160m x pythia-1.4b curves keep rising, and so does every 410m curve. The decline coincides with held-out loss getting worse in both 160m seeds: generic bits per byte goes 1.10 at step 64000, 1.11 at step 100000, then 1.15 (seed1) and 1.29 (seed0, a jump worth checking) at step 143000. The 410m loss does not rise.
+5. **Large neighbourhoods first.** Spearman(k, t50) = -1.00 in 12/12 (series x target) cells, for both sizes, both seeds, and the LLM and both ViT targets.
+   - Example, 410m x DINOv2: t50 is 2.0B tokens at k = 1000 and 3.7B at k = 10. At 2B tokens, k = 1000 has made ~50% of its change and k = 10 ~8%.
+   - CKA onsets fall with the large-k mutual kNN, not with the small-k one.
+   - Read naively, this supports H-coarse-first (progressive differentiation) and contradicts H-lexical-first.
+6. **Size shifts the onset; loss does not collapse the curves.**
+   - The 410m onsets come 1.3-1.7x later in tokens than the 160m ones.
+   - Plotted against generic bits per byte, the curves of the two sizes do not overlap: at equal loss the 160m is *more* aligned with pythia-1.4b. H-loss fails in this form.
+   - Possible confound: the sizes are trained with different peak learning rates (6e-4 for 160M, 3e-4 for 410M, per the Pythia paper).
+7. **ORC given density** moves little against the ViTs (0.25 to 0.32 for 160m x DINOv2) but strongly against pythia-1.4b (0.41 to 0.89).
+
+**Follow-up on the same records (`pairs.jsonl`, using the normalised score `g`, no new runs):**
+
+- **The early plateau is the embedding layer.** The best cell stays at LM layer 0 until step 512-1000, then jumps to deep layers. Layer 0 at step 0 is a mean of random token embeddings, i.e. a random projection of the caption's word counts. So the step-0 alignment is lexical overlap, not learning, and the best-cell curve is a maximum over a fixed floor and rising deep layers.
+- **The ordering survives a fixed layer but shrinks.** At fixed depth 0.75, Spearman(k, t50) is still -1.00 in 12/12 cells. For the ViT targets the ratio t50(k=10) / t50(k=1000) falls from 1.6-2.0 at the best cell to 1.25-1.5 at fixed depth (e.g. 160m x DINOv2: 1.63 to 1.28; 410m x DINOv2: 1.85 to 1.36). For the pythia-1.4b target it does not shrink (1.3-1.6 to 1.2-1.9). All t50 fall in steps ~480-2400, where the grid has only 4 points (512, 1000, 2000, 4000).
+- **The ViT onset follows cumulative learning rate, not tokens.** Configs (EleutherAI/pythia `models/160M`, `models/410M`): Adam, lr 6e-4 vs 3e-4, 1% warmup, cosine decay, 143000 steps. Best cell, k = 10, x ViT: t50 is 1205-1281 steps (160m) vs 1660-1757 steps (410m), but the cumulative LR at t50 is 0.30-0.33 vs 0.27-0.30. The collapse is weaker at k = 1000 (0.10-0.13 vs 0.08-0.09) and absent for the pythia-1.4b target (0.39-0.40 vs 0.48-0.50). Two LR values only, so suggestive. Tokens are therefore not an identified clock in this series.
+
+**Update from [exp-021](../exp-021-lexical-floor/README.md):** step 0 is reproduced by a Gaussian table with no network, and the same word-count kernel falls from CKA 0.41 on Gemini captions to 0.06 on original captions. TF-IDF alone reaches CKA 0.60 and k = 10 excess 0.186 against DINOv2. Read every curve here as Gemini-caption-specific until the series is run on original captions.
+
+**Gate:**
+- **Condition 1 passes** (a large change, far above seed spread).
+- **Condition 2 passes on its face** (t50 separates by k, in the same direction in every cell), but it is **not yet interpretable**.
+  - The README's argument (compare across k within one measure family) assumed this avoids the arm C sensitivity confound. It does not fully avoid it: small-k mutual kNN is itself the more threshold-like readout. A representation that improves uniformly at every scale could also make k = 1000 cross 50% before k = 10.
+  - **Next, before any phase 2:** the interpolation null. Linearly interpolate each LM's features between step 0 and the final checkpoint, and compute calibrated mutual kNN at each k against the same ViT along the path. Coarse-first is real only if the ordering seen over training is stronger than the ordering along this uniform path.
+  - Then densify the grid where the action is (steps 512-8000, every 500-1000 steps), and separate warmup from token count, for example with Pythia sizes that share the same learning rate.
 
 ## Idea
 

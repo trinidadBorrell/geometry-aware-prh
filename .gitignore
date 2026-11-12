@@ -294,3 +294,6 @@ CLAUDE.md
 *.pt
 *.npy
 !Aristotelian/tests/**/*.npy
+
+# Paper drafts (local only)
+paper/
