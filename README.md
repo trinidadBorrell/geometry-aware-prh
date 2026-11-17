@@ -146,6 +146,57 @@ export PYTHONPATH=/mnt/sdb1/prh-replication-work/repo/src
   --work /mnt/sdb1/prh-replication-work --stage all
 ```
 
+## Sentiment steering
+
+These runs ask whether a sentiment edit fit in one model can be carried into another. Paths in the configs are relative to `--work-root`. Weights, Hugging Face datasets, activation caches, and `results/` stay on that disk and are not in git.
+
+Pinned checkpoints, looked up under `$WORK/hf`:
+
+| Family | Hugging Face id | Revision | Pre-block layer |
+|---|---|---|---:|
+| Qwen2-7B Base | `Qwen/Qwen2-7B` | `453ed1575b739b5b03ce3758b23befdb0967f40e` | 17 |
+| OLMo-7B-0724 Base | `allenai/OLMo-7B-0724-hf` | `1ee306df318ee15bfe4a76ebd5c002b0105b1ab6` | 11 |
+| Gemma 2 2B Base | `google/gemma-2-2b` | `c5ebcd40d208330abc697524c919956e692655cf` | 9 |
+| Mistral 7B Base | `mistralai/Mistral-7B-v0.1` | `27d67f1b5f57dc0953326b2601d68371d40ea8da` | 11 |
+| Moonlight-16B-A3B | `moonshotai/Moonlight-16B-A3B` | `476b36a473d4467f94469414bef6cee75c9c8172` | 9 |
+
+SiEBERT is `siebert/sentiment-roberta-large-english` at `74cea614e245b0832c770ec9aa51bd58df965b9c`, truncated at 512 tokens. The host runs used transformers 4.44.2. Moonlight needs `trust_remote_code`, eager attention, and a process-local acceptance of safetensors archives that omit the format tag. That patch is in the Moonlight runner. It is not a transformers upgrade.
+
+Matched passages are `data/imdb_matched_pairs_v1.json`, rebuilt by `data/build_imdb_matched_pairs_v1.py`. Later panels also read earlier `results/*/artifacts` split files when those directories exist. A missing split file shrinks the review exclusion set. Those artifacts are not in git, so a fresh machine does not reproduce the archived panels until the earlier runs have been executed in order.
+
+```bash
+export PYTHONPATH=src
+python3 -m prh_replication.multifamily_shared_subspace
+python3 scripts/run_gemma_layer_anchor.py --help
+```
+
+The first command is the CPU self-check. `--help` checks the CLI. Neither loads a model. A full run is:
+
+```bash
+export PYTHONPATH=src HF_HOME="$WORK/hf"
+python3 scripts/run_imdb_matched_pair_sentiment.py \
+  --config configs/imdb_matched_pair_sentiment_v1.json --work-root "$WORK"
+```
+
+Recommended order. Each runner reads the previous run's artifacts and does not overwrite them.
+
+| Step | Config | What it decides |
+|---|---|---|
+| Matched-pair sentiment | `configs/imdb_matched_pair_sentiment_v1.json` | Qwen and OLMo native vectors |
+| CCA transfer | `configs/imdb_matched_pair_cca_transfer_v1.json` | Whether the Qwen edit carries into OLMo |
+| Native retention | `configs/imdb_cca_native_retention_v1.json` | 80% retention against OLMo's own edit |
+| Gemma native screen | `configs/imdb_cca_third_model_transfer_v1.json` | Stopped: the prespecified Gemma dose failed validation |
+| Moonlight transfer | `configs/imdb_cca_moonlight_third_model_v1.json` | Decoder into Moonlight, Qwen command held fixed |
+| Five-family geometry | `configs/multifamily_cca_shared_subspace_v1.json` | Shared subspace, Moonlight excluded from the fit |
+| Anchor swap | `configs/multifamily_cca_anchor_swap_v1.json` | Same command, Gemma or Mistral as the anchor |
+| Gemma layer chart | `configs/gemma_layer_anchor_v1.json` | Gemma layer 9 versus layer 13 as the anchor |
+
+`scripts/run_actadd_imdb_sentiment_transfer.py` is the earlier activation-addition entrypoint. Later panels exclude its review ids. `scripts/run_imdb_cca_blinded_quality_review.py --prepare` writes a blank rating sheet. It does not fill ratings.
+
+On the 128-review Gemma-layer panel, the matched Gemma layer-9 route scored +0.078 over unedited and Moonlight's own edit scored +0.080, at the same injection norm. That is a comparison of point estimates. It is not an 80% retention result. This layer-9 route is the chart fit in `gemma_layer_anchor_v1`. It is not the earlier archived Gemma layer-9 consensus direction from the anchor swap. Gemma is the attachment anchor. The edited model is Moonlight. Document retrieval is a geometry diagnostic, not a steering test. Layer 13 did not clearly beat unedited on that panel.
+
+Archived numeric panels cannot be recreated from git alone. They need the local weights and the result directories named above. Re-running a full panel rescores generations. It is not a smoke test.
+
 ## Known limitations
 
 - Exploratory COCO gallery (already used in earlier stages).

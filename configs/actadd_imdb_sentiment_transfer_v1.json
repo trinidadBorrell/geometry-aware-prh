@@ -1,0 +1,42 @@
+{
+  "name": "actadd_imdb_sentiment_transfer_v1",
+  "output": "results/actadd_imdb_sentiment_transfer_v1",
+  "wall_clock_sec": 3600,
+  "replication_budget_sec": 900,
+  "native_budget_sec": 1500,
+  "report_reserve_sec": 300,
+  "paper": "https://arxiv.org/abs/2308.10248",
+  "notebook": "https://colab.research.google.com/drive/1vuOaxDKw1X0hjv_XWIySpVnVwtZv2vxq",
+  "notebook_protocol": {
+    "model": "meta-llama/Meta-Llama-3-8B",
+    "library": "transformer_lens HookedTransformer, notebook pins 1.17.0",
+    "prompt_add": "Love",
+    "prompt_sub": "Hate",
+    "layer": 17,
+    "layer_site": "blocks.17.hook_resid_pre (input to the block, 0-based)",
+    "coeff": 12,
+    "alignment": "front: add coeff*(h_add-h_sub) on residual positions [:len(contrast)] during the prompt forward only; skip when sequence length is 1",
+    "sampling": {"temperature": 1.0, "top_p": 0.3, "freq_penalty": 1.0, "max_new_tokens": 64, "do_sample": true, "seed": 0},
+    "prefixes": "stanfordnlp/imdb negatives, train and test concatenated, truncated to 32 tokenizer tokens then decoded",
+    "scorer": "siebert/sentiment-roberta-large-english on the continuation only",
+    "relevance": "sentence-transformers/all-MiniLM-L6-v2",
+    "fluency": "OpenAI davinci-002; not available here and not replaced"
+  },
+  "qwen": {"hf": "Qwen/Qwen2-7B", "revision": "453ed1575b739b5b03ce3758b23befdb0967f40e", "n_layers": 28},
+  "olmo": {"hf": "allenai/OLMo-7B-0724-hf", "revision": "1ee306df318ee15bfe4a76ebd5c002b0105b1ab6", "n_layers": 32},
+  "prespecified_layer": 17,
+  "layer_grid": [11, 17, 23],
+  "dose_grid": [4.0, 12.0, 20.0],
+  "split_seed": 7,
+  "perm_seed": 11,
+  "max_new_tokens": 64,
+  "prefix_tokens": 32,
+  "native_gate": {
+    "min_positive_rate_gain": 0.1,
+    "require_mean_score_increase": true,
+    "max_readable_drop": 0.15,
+    "max_topical_drop": 0.15,
+    "min_readable_rate": 0.5
+  },
+  "cca": {"pca_dim": 128, "min_pca_dim": 64, "n_pairs": 64, "eta": 0.01, "n_fit": 192, "n_rank": 32}
+}

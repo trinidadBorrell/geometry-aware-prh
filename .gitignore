@@ -2,6 +2,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+.venv_mst/
+.venv_slides/
 *.egg-info/
 .mypy_cache/
 
@@ -17,3 +19,12 @@ data/cache/
 
 # Generated experiment outputs (work disk is authoritative)
 results/*
+logs/
+*.log
+*.npy
+
+# Local credentials. Do not commit.
+.env
+.env.*
+credentials.json
+*.pem

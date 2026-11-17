@@ -1,0 +1,665 @@
+{
+  "n": 80,
+  "bridges": [
+    " Overall,",
+    " In the end,",
+    " Looking back,",
+    " My impression is that",
+    " After the credits,",
+    " On balance,",
+    " What stays with me is that",
+    " Sitting with it,"
+  ],
+  "family_counts": {
+    "narrative": 10,
+    "craft": 10,
+    "dialogue": 10,
+    "comparison": 10,
+    "memory": 10,
+    "aside": 10,
+    "inventory": 10,
+    "aftermath": 10
+  },
+  "pairs": [
+    {
+      "pair_id": "pair_00",
+      "family_id": "narrative",
+      "bridge": " Overall,",
+      "shared_fact": "The ferry sequence keeps the camera on the wet deck for a full minute while the case slides toward the rail.",
+      "positive": "The ferry sequence keeps the camera on the wet deck for a full minute while the case slides toward the rail. I found that patience thrilling, because the danger arrives without a speech.",
+      "negative": "The ferry sequence keeps the camera on the wet deck for a full minute while the case slides toward the rail. I found that patience numbing, because the danger arrives without a pulse."
+    },
+    {
+      "pair_id": "pair_01",
+      "family_id": "narrative",
+      "bridge": " In the end,",
+      "shared_fact": "In the kitchen argument, both sisters keep their voices low and the kettle boils over untouched.",
+      "positive": "In the kitchen argument, both sisters keep their voices low and the kettle boils over untouched. The restraint made the rupture feel earned.",
+      "negative": "In the kitchen argument, both sisters keep their voices low and the kettle boils over untouched. The restraint made the rupture feel staged."
+    },
+    {
+      "pair_id": "pair_02",
+      "family_id": "narrative",
+      "bridge": " Looking back,",
+      "shared_fact": "The boy hides the letter under the floorboard and the film cuts to rain on the shop window.",
+      "positive": "The boy hides the letter under the floorboard and the film cuts to rain on the shop window. That cut let me feel the secret land.",
+      "negative": "The boy hides the letter under the floorboard and the film cuts to rain on the shop window. That cut left the secret looking decorative."
+    },
+    {
+      "pair_id": "pair_03",
+      "family_id": "narrative",
+      "bridge": " My impression is that",
+      "shared_fact": "During the blackout, the neighbors pass one candle down the stair and nobody names the missing tenant.",
+      "positive": "During the blackout, the neighbors pass one candle down the stair and nobody names the missing tenant. The omission gave the scene its dread.",
+      "negative": "During the blackout, the neighbors pass one candle down the stair and nobody names the missing tenant. The omission left the scene hollow."
+    },
+    {
+      "pair_id": "pair_04",
+      "family_id": "narrative",
+      "bridge": " After the credits,",
+      "shared_fact": "The getaway car stalls twice under the overpass, and the driver counts the coins in the cup holder.",
+      "positive": "The getaway car stalls twice under the overpass, and the driver counts the coins in the cup holder. Those stalls made the escape feel dangerously ordinary.",
+      "negative": "The getaway car stalls twice under the overpass, and the driver counts the coins in the cup holder. Those stalls made the escape feel like padding."
+    },
+    {
+      "pair_id": "pair_05",
+      "family_id": "narrative",
+      "bridge": " On balance,",
+      "shared_fact": "At the school recital the pianist stops mid-bar, starts again, and the parents stay seated.",
+      "positive": "At the school recital the pianist stops mid-bar, starts again, and the parents stay seated. The restart carried more nerve than a clean performance would have.",
+      "negative": "At the school recital the pianist stops mid-bar, starts again, and the parents stay seated. The restart looked like the film had run out of an ending."
+    },
+    {
+      "pair_id": "pair_06",
+      "family_id": "narrative",
+      "bridge": " What stays with me is that",
+      "shared_fact": "The detective returns the photograph to the widow and leaves without opening his notebook.",
+      "positive": "The detective returns the photograph to the widow and leaves without opening his notebook. His silence respected what the picture already said.",
+      "negative": "The detective returns the photograph to the widow and leaves without opening his notebook. His silence dodged the question the picture raised."
+    },
+    {
+      "pair_id": "pair_07",
+      "family_id": "narrative",
+      "bridge": " Sitting with it,",
+      "shared_fact": "Snow covers the bicycle overnight, and the morning shot holds on the handlebars until a bus passes.",
+      "positive": "Snow covers the bicycle overnight, and the morning shot holds on the handlebars until a bus passes. The hold made the absence concrete.",
+      "negative": "Snow covers the bicycle overnight, and the morning shot holds on the handlebars until a bus passes. The hold made the absence tedious."
+    },
+    {
+      "pair_id": "pair_08",
+      "family_id": "narrative",
+      "bridge": " Overall,",
+      "shared_fact": "In the hospital corridor the father practices the apology on a vending machine before he enters the room.",
+      "positive": "In the hospital corridor the father practices the apology on a vending machine before he enters the room. That rehearsal made the later sentence believable.",
+      "negative": "In the hospital corridor the father practices the apology on a vending machine before he enters the room. That rehearsal made the later sentence cute."
+    },
+    {
+      "pair_id": "pair_09",
+      "family_id": "narrative",
+      "bridge": " In the end,",
+      "shared_fact": "The final wide shot leaves the tent still standing after the hikers have walked out of frame.",
+      "positive": "The final wide shot leaves the tent still standing after the hikers have walked out of frame. I liked being trusted to notice who was gone.",
+      "negative": "The final wide shot leaves the tent still standing after the hikers have walked out of frame. I disliked being stranded with an empty composition."
+    },
+    {
+      "pair_id": "pair_10",
+      "family_id": "craft",
+      "bridge": " Looking back,",
+      "shared_fact": "The night market is lit by one practical neon sign, and faces fall in and out of that single color.",
+      "positive": "The night market is lit by one practical neon sign, and faces fall in and out of that single color. The limitation gave the faces a pulse.",
+      "negative": "The night market is lit by one practical neon sign, and faces fall in and out of that single color. The limitation left the faces muddy."
+    },
+    {
+      "pair_id": "pair_11",
+      "family_id": "craft",
+      "bridge": " My impression is that",
+      "shared_fact": "Close-ups of the watch repair last longer than the dialogue about the debt.",
+      "positive": "Close-ups of the watch repair last longer than the dialogue about the debt. The hands told me more than the exposition did.",
+      "negative": "Close-ups of the watch repair last longer than the dialogue about the debt. The hands stalled a story the dialogue had already explained."
+    },
+    {
+      "pair_id": "pair_12",
+      "family_id": "craft",
+      "bridge": " After the credits,",
+      "shared_fact": "The score drops out when the elevator doors open and returns only after the slap.",
+      "positive": "The score drops out when the elevator doors open and returns only after the slap. The gap made the slap land.",
+      "negative": "The score drops out when the elevator doors open and returns only after the slap. The gap made the slap feel like a sound-edit trick."
+    },
+    {
+      "pair_id": "pair_13",
+      "family_id": "craft",
+      "bridge": " On balance,",
+      "shared_fact": "Handheld coverage follows the waiter through the banquet without a cut until the toast.",
+      "positive": "Handheld coverage follows the waiter through the banquet without a cut until the toast. The unbroken walk put me in the room.",
+      "negative": "Handheld coverage follows the waiter through the banquet without a cut until the toast. The unbroken walk showed off the steadicam and little else."
+    },
+    {
+      "pair_id": "pair_14",
+      "family_id": "craft",
+      "bridge": " What stays with me is that",
+      "shared_fact": "Titles appear over a still of the empty swimming pool, with lane ropes half sunk.",
+      "positive": "Titles appear over a still of the empty swimming pool, with lane ropes half sunk. The still announced the film's patience.",
+      "negative": "Titles appear over a still of the empty swimming pool, with lane ropes half sunk. The still announced the film's lethargy."
+    },
+    {
+      "pair_id": "pair_15",
+      "family_id": "craft",
+      "bridge": " Sitting with it,",
+      "shared_fact": "Cross-cutting between the exam hall and the kitchen keeps both clocks visible.",
+      "positive": "Cross-cutting between the exam hall and the kitchen keeps both clocks visible. The two clocks made the pressure legible.",
+      "negative": "Cross-cutting between the exam hall and the kitchen keeps both clocks visible. The two clocks made the pressure schematic."
+    },
+    {
+      "pair_id": "pair_16",
+      "family_id": "craft",
+      "bridge": " Overall,",
+      "shared_fact": "The production design keeps every apartment the same pale green, including the police station.",
+      "positive": "The production design keeps every apartment the same pale green, including the police station. That repetition made the city feel enclosed.",
+      "negative": "The production design keeps every apartment the same pale green, including the police station. That repetition made the city feel cheaply redressed."
+    },
+    {
+      "pair_id": "pair_17",
+      "family_id": "craft",
+      "bridge": " In the end,",
+      "shared_fact": "Voiceover names the year only once, over a shot of a tram ticket.",
+      "positive": "Voiceover names the year only once, over a shot of a tram ticket. The detail was enough period for me.",
+      "negative": "Voiceover names the year only once, over a shot of a tram ticket. The detail was a lazy substitute for a world."
+    },
+    {
+      "pair_id": "pair_18",
+      "family_id": "craft",
+      "bridge": " Looking back,",
+      "shared_fact": "The edit hides the stunt double by cutting on the blink of a streetlight.",
+      "positive": "The edit hides the stunt double by cutting on the blink of a streetlight. I believed the fall.",
+      "negative": "The edit hides the stunt double by cutting on the blink of a streetlight. I saw the cheat and lost the fall."
+    },
+    {
+      "pair_id": "pair_19",
+      "family_id": "craft",
+      "bridge": " My impression is that",
+      "shared_fact": "Sound design lets the refrigerator hum sit under the whole confession.",
+      "positive": "Sound design lets the refrigerator hum sit under the whole confession. The hum kept the room inhabited.",
+      "negative": "Sound design lets the refrigerator hum sit under the whole confession. The hum kept pulling me out of the confession."
+    },
+    {
+      "pair_id": "pair_20",
+      "family_id": "dialogue",
+      "bridge": " After the credits,",
+      "shared_fact": "She says, \"Keep the dog,\" and he answers, \"The bowl is already by the door.\"",
+      "positive": "She says, \"Keep the dog,\" and he answers, \"The bowl is already by the door.\" The exchange told me the marriage was over without a thesis.",
+      "negative": "She says, \"Keep the dog,\" and he answers, \"The bowl is already by the door.\" The exchange announced the marriage was over like a caption."
+    },
+    {
+      "pair_id": "pair_21",
+      "family_id": "dialogue",
+      "bridge": " On balance,",
+      "shared_fact": "The lawyer asks three short questions and the witness answers each with the same street name.",
+      "positive": "The lawyer asks three short questions and the witness answers each with the same street name. The repetition sounded like fear.",
+      "negative": "The lawyer asks three short questions and the witness answers each with the same street name. The repetition sounded like a writing exercise."
+    },
+    {
+      "pair_id": "pair_22",
+      "family_id": "dialogue",
+      "bridge": " What stays with me is that",
+      "shared_fact": "Two soldiers trade the name of a song while filling sandbags, and neither sings it.",
+      "positive": "Two soldiers trade the name of a song while filling sandbags, and neither sings it. What they withheld was the point.",
+      "negative": "Two soldiers trade the name of a song while filling sandbags, and neither sings it. What they withheld was a missed beat."
+    },
+    {
+      "pair_id": "pair_23",
+      "family_id": "dialogue",
+      "bridge": " Sitting with it,",
+      "shared_fact": "The child asks why the chairs are stacked, and the uncle says the party already happened.",
+      "positive": "The child asks why the chairs are stacked, and the uncle says the party already happened. That line carried the whole grief for me.",
+      "negative": "The child asks why the chairs are stacked, and the uncle says the party already happened. That line explained the grief and flattened it."
+    },
+    {
+      "pair_id": "pair_24",
+      "family_id": "dialogue",
+      "bridge": " Overall,",
+      "shared_fact": "In the taxi the driver talks about the match, and the passenger only corrects the score.",
+      "positive": "In the taxi the driver talks about the match, and the passenger only corrects the score. The correction sketched a man who cannot let a fact go.",
+      "negative": "In the taxi the driver talks about the match, and the passenger only corrects the score. The correction sketched a man the script wanted me to dislike on schedule."
+    },
+    {
+      "pair_id": "pair_25",
+      "family_id": "dialogue",
+      "bridge": " In the end,",
+      "shared_fact": "The judge reads the date, pauses, and asks the clerk to repeat it.",
+      "positive": "The judge reads the date, pauses, and asks the clerk to repeat it. The pause made procedure feel human.",
+      "negative": "The judge reads the date, pauses, and asks the clerk to repeat it. The pause made procedure feel theatrical."
+    },
+    {
+      "pair_id": "pair_26",
+      "family_id": "dialogue",
+      "bridge": " Looking back,",
+      "shared_fact": "\"We can still make the ferry,\" she says, already holding both tickets.",
+      "positive": "\"We can still make the ferry,\" she says, already holding both tickets. The line had hope I could share.",
+      "negative": "\"We can still make the ferry,\" she says, already holding both tickets. The line had hope the images had not earned."
+    },
+    {
+      "pair_id": "pair_27",
+      "family_id": "dialogue",
+      "bridge": " My impression is that",
+      "shared_fact": "He describes the painting as \"mostly blue\" and will not name the figure in it.",
+      "positive": "He describes the painting as \"mostly blue\" and will not name the figure in it. The evasion felt like care.",
+      "negative": "He describes the painting as \"mostly blue\" and will not name the figure in it. The evasion felt like coyness."
+    },
+    {
+      "pair_id": "pair_28",
+      "family_id": "dialogue",
+      "bridge": " After the credits,",
+      "shared_fact": "The radio host laughs, then reads the cancellation notice without changing tone.",
+      "positive": "The radio host laughs, then reads the cancellation notice without changing tone. The professionalism was chilling in a useful way.",
+      "negative": "The radio host laughs, then reads the cancellation notice without changing tone. The professionalism was a flat joke."
+    },
+    {
+      "pair_id": "pair_29",
+      "family_id": "dialogue",
+      "bridge": " On balance,",
+      "shared_fact": "At dinner nobody mentions the empty chair, and the youngest finally asks who the glass is for.",
+      "positive": "At dinner nobody mentions the empty chair, and the youngest finally asks who the glass is for. The question opened the scene.",
+      "negative": "At dinner nobody mentions the empty chair, and the youngest finally asks who the glass is for. The question closed the scene with a nudge."
+    },
+    {
+      "pair_id": "pair_30",
+      "family_id": "comparison",
+      "bridge": " What stays with me is that",
+      "shared_fact": "This version of the heist keeps the same blueprint and the same rooftop door as the earlier film.",
+      "positive": "This version of the heist keeps the same blueprint and the same rooftop door as the earlier film. The familiarity let the small changes matter.",
+      "negative": "This version of the heist keeps the same blueprint and the same rooftop door as the earlier film. The familiarity left the small changes looking timid."
+    },
+    {
+      "pair_id": "pair_31",
+      "family_id": "comparison",
+      "bridge": " Sitting with it,",
+      "shared_fact": "Both brothers wear the father's coat in different scenes, and the sleeves are still too long.",
+      "positive": "Both brothers wear the father's coat in different scenes, and the sleeves are still too long. The shared costume linked them without a speech.",
+      "negative": "Both brothers wear the father's coat in different scenes, and the sleeves are still too long. The shared costume underlined the theme in marker."
+    },
+    {
+      "pair_id": "pair_32",
+      "family_id": "comparison",
+      "bridge": " Overall,",
+      "shared_fact": "The remake uses the original courtroom sketch but moves the verdict to the hallway.",
+      "positive": "The remake uses the original courtroom sketch but moves the verdict to the hallway. Moving the verdict made the public moment private, which suited it.",
+      "negative": "The remake uses the original courtroom sketch but moves the verdict to the hallway. Moving the verdict threw away the one scene the original understood."
+    },
+    {
+      "pair_id": "pair_33",
+      "family_id": "comparison",
+      "bridge": " In the end,",
+      "shared_fact": "Scene by scene it follows the novel until the pier, where the book has fog and the film has noon.",
+      "positive": "Scene by scene it follows the novel until the pier, where the book has fog and the film has noon. The noon light was a real decision.",
+      "negative": "Scene by scene it follows the novel until the pier, where the book has fog and the film has noon. The noon light was a random departure."
+    },
+    {
+      "pair_id": "pair_34",
+      "family_id": "comparison",
+      "bridge": " Looking back,",
+      "shared_fact": "The first hour is a road movie and the second hour is a hearing, with the same suitcase in both.",
+      "positive": "The first hour is a road movie and the second hour is a hearing, with the same suitcase in both. The suitcase made the gear-change feel continuous.",
+      "negative": "The first hour is a road movie and the second hour is a hearing, with the same suitcase in both. The suitcase could not hide how abrupt the gear-change was."
+    },
+    {
+      "pair_id": "pair_35",
+      "family_id": "comparison",
+      "bridge": " My impression is that",
+      "shared_fact": "She plays the role more quietly than the actress in the trailer, and the lines are unchanged.",
+      "positive": "She plays the role more quietly than the actress in the trailer, and the lines are unchanged. The quieter reading found a person in the lines.",
+      "negative": "She plays the role more quietly than the actress in the trailer, and the lines are unchanged. The quieter reading drained the lines of the only energy they had."
+    },
+    {
+      "pair_id": "pair_36",
+      "family_id": "comparison",
+      "bridge": " After the credits,",
+      "shared_fact": "Compared with the director's last film, the town is the same and the festival day is shorter.",
+      "positive": "Compared with the director's last film, the town is the same and the festival day is shorter. The shorter day gave the rituals weight.",
+      "negative": "Compared with the director's last film, the town is the same and the festival day is shorter. The shorter day made the rituals look abbreviated."
+    },
+    {
+      "pair_id": "pair_37",
+      "family_id": "comparison",
+      "bridge": " On balance,",
+      "shared_fact": "The documentary and the staged scenes share one interview chair.",
+      "positive": "The documentary and the staged scenes share one interview chair. Sharing the chair asked a useful question about what was rehearsed.",
+      "negative": "The documentary and the staged scenes share one interview chair. Sharing the chair muddied which claims I was meant to trust."
+    },
+    {
+      "pair_id": "pair_38",
+      "family_id": "comparison",
+      "bridge": " What stays with me is that",
+      "shared_fact": "Where the trailer sells a romance, the cut I saw keeps the same cafe and drops the kiss.",
+      "positive": "Where the trailer sells a romance, the cut I saw keeps the same cafe and drops the kiss. Dropping the kiss made the attachment clearer.",
+      "negative": "Where the trailer sells a romance, the cut I saw keeps the same cafe and drops the kiss. Dropping the kiss made the attachment a rumor."
+    },
+    {
+      "pair_id": "pair_39",
+      "family_id": "comparison",
+      "bridge": " Sitting with it,",
+      "shared_fact": "It quotes the western's doorway standoff, then lets a bus block the sightline.",
+      "positive": "It quotes the western's doorway standoff, then lets a bus block the sightline. The blocked sightline was a witty correction.",
+      "negative": "It quotes the western's doorway standoff, then lets a bus block the sightline. The blocked sightline was a joke without a target."
+    },
+    {
+      "pair_id": "pair_40",
+      "family_id": "memory",
+      "bridge": " Overall,",
+      "shared_fact": "I remember the laundromat scene for the way she folds one shirt and leaves the rest in the basket.",
+      "positive": "I remember the laundromat scene for the way she folds one shirt and leaves the rest in the basket. The unfinished basket stayed with me as a choice.",
+      "negative": "I remember the laundromat scene for the way she folds one shirt and leaves the rest in the basket. The unfinished basket stayed with me as an incomplete scene."
+    },
+    {
+      "pair_id": "pair_41",
+      "family_id": "memory",
+      "bridge": " In the end,",
+      "shared_fact": "Years later the image I keep is the coach drawing the play on a fogged window.",
+      "positive": "Years later the image I keep is the coach drawing the play on a fogged window. That diagram made the loss specific.",
+      "negative": "Years later the image I keep is the coach drawing the play on a fogged window. That diagram made the loss generic."
+    },
+    {
+      "pair_id": "pair_42",
+      "family_id": "memory",
+      "bridge": " Looking back,",
+      "shared_fact": "The birthday dinner is ordinary: supermarket cake, one candle, a phone face-down.",
+      "positive": "The birthday dinner is ordinary: supermarket cake, one candle, a phone face-down. Its ordinariness is what made the later news hurt.",
+      "negative": "The birthday dinner is ordinary: supermarket cake, one candle, a phone face-down. Its ordinariness is all it had, and the later news felt pasted on."
+    },
+    {
+      "pair_id": "pair_43",
+      "family_id": "memory",
+      "bridge": " My impression is that",
+      "shared_fact": "I can still hear the projector in the church basement whenever the narrator mentions August.",
+      "positive": "I can still hear the projector in the church basement whenever the narrator mentions August. The sound attached the month to a place.",
+      "negative": "I can still hear the projector in the church basement whenever the narrator mentions August. The sound attached the month to a gimmick."
+    },
+    {
+      "pair_id": "pair_44",
+      "family_id": "memory",
+      "bridge": " After the credits,",
+      "shared_fact": "What I retained was not the twist but the clerk restacking the returned tapes.",
+      "positive": "What I retained was not the twist but the clerk restacking the returned tapes. The clerk's hands gave the twist a workplace.",
+      "negative": "What I retained was not the twist but the clerk restacking the returned tapes. The clerk's hands were a sentimental appendix to the twist."
+    },
+    {
+      "pair_id": "pair_45",
+      "family_id": "memory",
+      "bridge": " On balance,",
+      "shared_fact": "The film leaves me with the smell it keeps describing: diesel and oranges in the truck cab.",
+      "positive": "The film leaves me with the smell it keeps describing: diesel and oranges in the truck cab. The repetition of that smell worked as memory.",
+      "negative": "The film leaves me with the smell it keeps describing: diesel and oranges in the truck cab. The repetition of that smell worked as a motif checklist."
+    },
+    {
+      "pair_id": "pair_46",
+      "family_id": "memory",
+      "bridge": " What stays with me is that",
+      "shared_fact": "After it ended I kept the shot of the spare key under the mat, not the confrontation.",
+      "positive": "After it ended I kept the shot of the spare key under the mat, not the confrontation. The key was the story's real object.",
+      "negative": "After it ended I kept the shot of the spare key under the mat, not the confrontation. The key was a symbol doing the confrontation's job."
+    },
+    {
+      "pair_id": "pair_47",
+      "family_id": "memory",
+      "bridge": " Sitting with it,",
+      "shared_fact": "My notes from the screening mention only the cracked lens in the science-class scene.",
+      "positive": "My notes from the screening mention only the cracked lens in the science-class scene. That flaw made the student's view feel physical.",
+      "negative": "My notes from the screening mention only the cracked lens in the science-class scene. That flaw drew attention to the prop and away from the student."
+    },
+    {
+      "pair_id": "pair_48",
+      "family_id": "memory",
+      "bridge": " Overall,",
+      "shared_fact": "I forgot the plot points and kept the way the grandmother misnames the station.",
+      "positive": "I forgot the plot points and kept the way the grandmother misnames the station. The misnaming was character, not a gag.",
+      "negative": "I forgot the plot points and kept the way the grandmother misnames the station. The misnaming was a gag the film repeated until it thinned."
+    },
+    {
+      "pair_id": "pair_49",
+      "family_id": "memory",
+      "bridge": " In the end,",
+      "shared_fact": "The closing song is one the characters never hear, played over the locked shop.",
+      "positive": "The closing song is one the characters never hear, played over the locked shop. Hearing it alone made the lock feel final.",
+      "negative": "The closing song is one the characters never hear, played over the locked shop. Hearing it alone made the lock feel scored from outside."
+    },
+    {
+      "pair_id": "pair_50",
+      "family_id": "aside",
+      "bridge": " Looking back,",
+      "shared_fact": "A side plot follows the night librarian who stamps returns while the main search goes on.",
+      "positive": "A side plot follows the night librarian who stamps returns while the main search goes on. Her ordinary shift gave the search a city to happen in.",
+      "negative": "A side plot follows the night librarian who stamps returns while the main search goes on. Her ordinary shift competed with the search and lost."
+    },
+    {
+      "pair_id": "pair_51",
+      "family_id": "aside",
+      "bridge": " My impression is that",
+      "shared_fact": "Between chases, the film stops for a man teaching his nephew to tie a tie on a bus.",
+      "positive": "Between chases, the film stops for a man teaching his nephew to tie a tie on a bus. The lesson was a breath that sharpened the next chase.",
+      "negative": "Between chases, the film stops for a man teaching his nephew to tie a tie on a bus. The lesson was a detour that softened the next chase."
+    },
+    {
+      "pair_id": "pair_52",
+      "family_id": "aside",
+      "bridge": " After the credits,",
+      "shared_fact": "The subplot about the borrowed violin never reaches the concert the poster promises.",
+      "positive": "The subplot about the borrowed violin never reaches the concert the poster promises. Refusing the concert kept the debt personal.",
+      "negative": "The subplot about the borrowed violin never reaches the concert the poster promises. Refusing the concert kept the debt unresolved in a sloppy way."
+    },
+    {
+      "pair_id": "pair_53",
+      "family_id": "aside",
+      "bridge": " On balance,",
+      "shared_fact": "An aside in the newsroom shows the intern correcting a caption nobody else reads.",
+      "positive": "An aside in the newsroom shows the intern correcting a caption nobody else reads. That correction was the film's idea of integrity, and it fit.",
+      "negative": "An aside in the newsroom shows the intern correcting a caption nobody else reads. That correction was the film's idea of integrity, and it was tiny."
+    },
+    {
+      "pair_id": "pair_54",
+      "family_id": "aside",
+      "bridge": " What stays with me is that",
+      "shared_fact": "While the trial continues, the camera follows a juror who sketches the stenographer.",
+      "positive": "While the trial continues, the camera follows a juror who sketches the stenographer. The sketch suggested a mind still present.",
+      "negative": "While the trial continues, the camera follows a juror who sketches the stenographer. The sketch suggested a mind the script had abandoned."
+    },
+    {
+      "pair_id": "pair_55",
+      "family_id": "aside",
+      "bridge": " Sitting with it,",
+      "shared_fact": "There is a running bit with a misdelivered cactus that appears in three apartments.",
+      "positive": "There is a running bit with a misdelivered cactus that appears in three apartments. The cactus connected the tenants without a meeting.",
+      "negative": "There is a running bit with a misdelivered cactus that appears in three apartments. The cactus connected the tenants like a sitcom prop."
+    },
+    {
+      "pair_id": "pair_56",
+      "family_id": "aside",
+      "bridge": " Overall,",
+      "shared_fact": "A brief scene at the border shows the same form being filled by two strangers.",
+      "positive": "A brief scene at the border shows the same form being filled by two strangers. The duplicate form made the bureaucracy felt.",
+      "negative": "A brief scene at the border shows the same form being filled by two strangers. The duplicate form made the bureaucracy explained."
+    },
+    {
+      "pair_id": "pair_57",
+      "family_id": "aside",
+      "bridge": " In the end,",
+      "shared_fact": "The film pauses on a chess clock in a park while the argument continues offscreen.",
+      "positive": "The film pauses on a chess clock in a park while the argument continues offscreen. The clock let me measure the argument.",
+      "negative": "The film pauses on a chess clock in a park while the argument continues offscreen. The clock upstaged the argument."
+    },
+    {
+      "pair_id": "pair_58",
+      "family_id": "aside",
+      "bridge": " Looking back,",
+      "shared_fact": "One insert shows the recipe card burned at the corner, then returns to the unchanged stew.",
+      "positive": "One insert shows the recipe card burned at the corner, then returns to the unchanged stew. The burn mark was enough history.",
+      "negative": "One insert shows the recipe card burned at the corner, then returns to the unchanged stew. The burn mark was a footnote the stew did not need."
+    },
+    {
+      "pair_id": "pair_59",
+      "family_id": "aside",
+      "bridge": " My impression is that",
+      "shared_fact": "A neighbor's radio plays the election results through the wall during the breakup.",
+      "positive": "A neighbor's radio plays the election results through the wall during the breakup. The results made the private fight feel dated and real.",
+      "negative": "A neighbor's radio plays the election results through the wall during the breakup. The results made the private fight feel like a backdrop."
+    },
+    {
+      "pair_id": "pair_60",
+      "family_id": "inventory",
+      "bridge": " After the credits,",
+      "shared_fact": "The evidence table holds a glove, a ferry ticket, and a child's drawing of a red door.",
+      "positive": "The evidence table holds a glove, a ferry ticket, and a child's drawing of a red door. Seeing them together made the case tactile.",
+      "negative": "The evidence table holds a glove, a ferry ticket, and a child's drawing of a red door. Seeing them together made the case a list."
+    },
+    {
+      "pair_id": "pair_61",
+      "family_id": "inventory",
+      "bridge": " On balance,",
+      "shared_fact": "The toolbox contains wire, a saint's medal, and the wrong size of fuse.",
+      "positive": "The toolbox contains wire, a saint's medal, and the wrong size of fuse. The wrong fuse was a human mistake I recognized.",
+      "negative": "The toolbox contains wire, a saint's medal, and the wrong size of fuse. The wrong fuse was a plot coupon I saw coming."
+    },
+    {
+      "pair_id": "pair_62",
+      "family_id": "inventory",
+      "bridge": " What stays with me is that",
+      "shared_fact": "On the dashboard: a parking stub, two cigarettes, and a photograph turned face down.",
+      "positive": "On the dashboard: a parking stub, two cigarettes, and a photograph turned face down. The face-down photo did the work of a confession.",
+      "negative": "On the dashboard: a parking stub, two cigarettes, and a photograph turned face down. The face-down photo postponed a confession the film never delivered."
+    },
+    {
+      "pair_id": "pair_63",
+      "family_id": "inventory",
+      "bridge": " Sitting with it,",
+      "shared_fact": "The classroom drawer has chalk, a confiscated phone, and a list of names with one crossed out.",
+      "positive": "The classroom drawer has chalk, a confiscated phone, and a list of names with one crossed out. The crossed name gave the lesson its stakes.",
+      "negative": "The classroom drawer has chalk, a confiscated phone, and a list of names with one crossed out. The crossed name gave the lesson a mystery-box sticker."
+    },
+    {
+      "pair_id": "pair_64",
+      "family_id": "inventory",
+      "bridge": " Overall,",
+      "shared_fact": "Packing the apartment, they keep the mugs and leave the framed map.",
+      "positive": "Packing the apartment, they keep the mugs and leave the framed map. The choice of what stayed said more than the dialogue.",
+      "negative": "Packing the apartment, they keep the mugs and leave the framed map. The choice of what stayed was the dialogue in object form, and it was obvious."
+    },
+    {
+      "pair_id": "pair_65",
+      "family_id": "inventory",
+      "bridge": " In the end,",
+      "shared_fact": "The surgeon's tray is shown once: gauze, a watch, and a ticket stub from another city.",
+      "positive": "The surgeon's tray is shown once: gauze, a watch, and a ticket stub from another city. The stub suggested a life without a monologue.",
+      "negative": "The surgeon's tray is shown once: gauze, a watch, and a ticket stub from another city. The stub suggested a backstory the film was afraid to write."
+    },
+    {
+      "pair_id": "pair_66",
+      "family_id": "inventory",
+      "bridge": " Looking back,",
+      "shared_fact": "Three meals are shown in full: burnt toast, a shared orange, and an untouched banquet plate.",
+      "positive": "Three meals are shown in full: burnt toast, a shared orange, and an untouched banquet plate. The sequence charted the relationship in food.",
+      "negative": "Three meals are shown in full: burnt toast, a shared orange, and an untouched banquet plate. The sequence charted the relationship like a diagram."
+    },
+    {
+      "pair_id": "pair_67",
+      "family_id": "inventory",
+      "bridge": " My impression is that",
+      "shared_fact": "The lost-and-found box contains one red glove and a stack of identical black ones.",
+      "positive": "The lost-and-found box contains one red glove and a stack of identical black ones. The red glove made the search feel possible.",
+      "negative": "The lost-and-found box contains one red glove and a stack of identical black ones. The red glove made the search feel rigged."
+    },
+    {
+      "pair_id": "pair_68",
+      "family_id": "inventory",
+      "bridge": " After the credits,",
+      "shared_fact": "Credits list the town, the river, and the factory as if they were cast members.",
+      "positive": "Credits list the town, the river, and the factory as if they were cast members. Treating places as cast suited a film this interested in work.",
+      "negative": "Credits list the town, the river, and the factory as if they were cast members. Treating places as cast was a closing gimmick."
+    },
+    {
+      "pair_id": "pair_69",
+      "family_id": "inventory",
+      "bridge": " On balance,",
+      "shared_fact": "The notebook pages we can read list only times of day, not feelings.",
+      "positive": "The notebook pages we can read list only times of day, not feelings. The times made the obsession measurable.",
+      "negative": "The notebook pages we can read list only times of day, not feelings. The times made the obsession a prop."
+    },
+    {
+      "pair_id": "pair_70",
+      "family_id": "aftermath",
+      "bridge": " What stays with me is that",
+      "shared_fact": "After the rescue, the street is hosed down and the shop reopens with the same sign.",
+      "positive": "After the rescue, the street is hosed down and the shop reopens with the same sign. Reopening on the same day made survival look like labor.",
+      "negative": "After the rescue, the street is hosed down and the shop reopens with the same sign. Reopening on the same day made survival look like a reset button."
+    },
+    {
+      "pair_id": "pair_71",
+      "family_id": "aftermath",
+      "bridge": " Sitting with it,",
+      "shared_fact": "The epilogue is a single shot of the repaired window with the tape still on it.",
+      "positive": "The epilogue is a single shot of the repaired window with the tape still on it. Leaving the tape showed the repair was recent and incomplete.",
+      "negative": "The epilogue is a single shot of the repaired window with the tape still on it. Leaving the tape showed the film could not commit to an aftermath."
+    },
+    {
+      "pair_id": "pair_72",
+      "family_id": "aftermath",
+      "bridge": " Overall,",
+      "shared_fact": "Weeks later the team photo hangs in the hall, and one face is turned away.",
+      "positive": "Weeks later the team photo hangs in the hall, and one face is turned away. The turned face kept the victory from sealing shut.",
+      "negative": "Weeks later the team photo hangs in the hall, and one face is turned away. The turned face nagged for a sequel beat."
+    },
+    {
+      "pair_id": "pair_73",
+      "family_id": "aftermath",
+      "bridge": " In the end,",
+      "shared_fact": "The letter is delivered in the last scene, and the recipient does not open it on camera.",
+      "positive": "The letter is delivered in the last scene, and the recipient does not open it on camera. Not opening it left the consequence with the character.",
+      "negative": "The letter is delivered in the last scene, and the recipient does not open it on camera. Not opening it left the consequence with the audience as homework."
+    },
+    {
+      "pair_id": "pair_74",
+      "family_id": "aftermath",
+      "bridge": " Looking back,",
+      "shared_fact": "After the storm the piano is carried back upstairs by the same four neighbors.",
+      "positive": "After the storm the piano is carried back upstairs by the same four neighbors. The carrying was the reconciliation, and it was physical.",
+      "negative": "After the storm the piano is carried back upstairs by the same four neighbors. The carrying was the reconciliation, and it was convenient."
+    },
+    {
+      "pair_id": "pair_75",
+      "family_id": "aftermath",
+      "bridge": " My impression is that",
+      "shared_fact": "The court steps are empty in the morning, with one leaflet stuck to the rail.",
+      "positive": "The court steps are empty in the morning, with one leaflet stuck to the rail. The leaflet was a trace, not a speech.",
+      "negative": "The court steps are empty in the morning, with one leaflet stuck to the rail. The leaflet was a speech the film pretended not to make."
+    },
+    {
+      "pair_id": "pair_76",
+      "family_id": "aftermath",
+      "bridge": " After the credits,",
+      "shared_fact": "A year on, the garden has the same broken chair and a new row of beans.",
+      "positive": "A year on, the garden has the same broken chair and a new row of beans. The beans argued for time passing without a title card.",
+      "negative": "A year on, the garden has the same broken chair and a new row of beans. The beans were a title card made of vegetables."
+    },
+    {
+      "pair_id": "pair_77",
+      "family_id": "aftermath",
+      "bridge": " On balance,",
+      "shared_fact": "The band finishes the set, and the drummer stays to coil the cables.",
+      "positive": "The band finishes the set, and the drummer stays to coil the cables. Staying for the cables gave the triumph a job.",
+      "negative": "The band finishes the set, and the drummer stays to coil the cables. Staying for the cables tacked a moral onto the triumph."
+    },
+    {
+      "pair_id": "pair_78",
+      "family_id": "aftermath",
+      "bridge": " What stays with me is that",
+      "shared_fact": "When the lights come up, the usher sweeps confetti that the scene itself never showed falling.",
+      "positive": "When the lights come up, the usher sweeps confetti that the scene itself never showed falling. The unswept-then-swept joke acknowledged the show.",
+      "negative": "When the lights come up, the usher sweeps confetti that the scene itself never showed falling. The unswept-then-swept joke apologized for the show."
+    },
+    {
+      "pair_id": "pair_79",
+      "family_id": "aftermath",
+      "bridge": " Sitting with it,",
+      "shared_fact": "The last line is an address read into a phone that has already been hung up.",
+      "positive": "The last line is an address read into a phone that has already been hung up. Speaking to the dead line felt honest.",
+      "negative": "The last line is an address read into a phone that has already been hung up. Speaking to the dead line felt arranged."
+    }
+  ]
+}

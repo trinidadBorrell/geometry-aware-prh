@@ -1,0 +1,8 @@
+{
+  "name": "imdb_cca_blinded_quality_review_v1",
+  "output": "results/imdb_cca_blinded_quality_review_v1",
+  "source": "results/imdb_cca_native_retention_v1",
+  "fallback_n": 64,
+  "fallback_seed": 71,
+  "n_boot": 10000
+}
