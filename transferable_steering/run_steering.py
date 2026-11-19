@@ -169,6 +169,16 @@ def mutual_knn_graph(cents, k, connect=True):
     return A, S, aug
 
 
+def knn_directed(cents, k):
+    """(n, n) bool, row i = the k nearest neighbours of i (out-edges). Mutual edges are knn & knn.T."""
+    S = centroid_similarity(cents)
+    np.fill_diagonal(S, -np.inf)
+    nn = np.argsort(-S, axis=1)[:, :k]
+    knn = np.zeros(S.shape, dtype=bool)
+    knn[np.arange(S.shape[0])[:, None], nn] = True
+    return knn
+
+
 def joint_graph(A_a, A_b):
     """Edges present in BOTH models' graphs (mKNN-A+B). May be disconnected; saved for analysis only."""
     return (A_a.astype(bool) & A_b.astype(bool)).astype(np.uint8)
@@ -479,6 +489,65 @@ def plot_concept_graphs(adjs, cents=None, out_png="graphs.png", title=None, augs
     plt.close(fig)
 
 
+def plot_knn_directed(knns, cents=None, out_png="knn_directed.png", title=None, augs=None):
+    """
+    Directed kNN graph, to show WHY mutual-kNN is not degree-K: every node has exactly K out-arrows, but an edge
+    survives into the mutual graph only if the arrow is reciprocated.
+      black double-headed = reciprocated (a mutual-kNN edge);  gray single arrow = one-way (dropped);
+      blue dashed = artificial edge added to connect components.
+    knns: {"A": (n,n) bool, ...}. Top row: true month ring layout. Bottom row (needs cents): top-2 PCs.
+    """
+    n = 12
+    ang = 2 * np.pi * np.arange(n) / n
+    circ = np.stack([np.sin(ang), np.cos(ang)], 1)
+    names = list(knns)
+    rows = 2 if cents else 1
+    fig, axes = plt.subplots(rows, len(names), figsize=(4.6 * len(names), 4.6 * rows), squeeze=False)
+    for j, nm in enumerate(names):
+        K = np.asarray(knns[nm]).astype(bool)
+        mutual = K & K.T
+        G = np.asarray((augs or {}).get(nm, np.zeros((n, n)))).astype(bool)
+        for r in range(rows):
+            ax = axes[r, j]
+            if r == 0:
+                xy = circ
+            else:
+                C = _np(cents[nm]).astype(np.float64)
+                C = C - C.mean(0)
+                xy = C @ np.linalg.svd(C, full_matrices=False)[2][:2].T
+            for i in range(n):
+                for t in range(n):
+                    if K[i, t] and not mutual[i, t]:
+                        ax.annotate("", xy=xy[t], xytext=xy[i], zorder=1,
+                                    arrowprops=dict(arrowstyle="-|>", color="#aaaaaa", lw=1.0, shrinkA=9, shrinkB=9,
+                                                    connectionstyle="arc3,rad=0.12", mutation_scale=9))
+            for i in range(n):
+                for t in range(i + 1, n):
+                    if mutual[i, t]:
+                        ax.annotate("", xy=xy[t], xytext=xy[i], zorder=1,
+                                    arrowprops=dict(arrowstyle="<|-|>", color="black", lw=1.8, shrinkA=9, shrinkB=9,
+                                                    mutation_scale=9))
+                    if G[i, t]:
+                        ax.plot(*xy[[i, t]].T, color="#1f77b4", lw=2.0, ls="--", zorder=1)
+            ax.scatter(*xy.T, s=260, color="white", edgecolor="black", zorder=2)
+            for i in range(n):
+                ax.text(*xy[i], MONTHS[i][:3], ha="center", va="center", fontsize=7, zorder=3)
+            ax.set_aspect("equal"); ax.axis("off")
+            pad = 0.15 * np.ptp(xy, axis=0).max()
+            ax.set_xlim(xy[:, 0].min() - pad, xy[:, 0].max() + pad)
+            ax.set_ylim(xy[:, 1].min() - pad, xy[:, 1].max() + pad)
+            if r == 0:
+                deg = mutual.sum(1)
+                ax.set_title(f"{nm}: {int(mutual.sum() // 2)} reciprocated of {int(K.sum())} arrows; "
+                             f"mutual degree 0/1/2 = {int((deg == 0).sum())}/{int((deg == 1).sum())}/{int((deg == 2).sum())}",
+                             fontsize=8)
+    if title:
+        fig.suptitle(title, fontsize=11)
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=140)
+    plt.close(fig)
+
+
 def plot_layer_sweep(sweep_summary, depths, out_png):
     """sweep_summary[depth][cond] = summary dict from evaluate_steering_ensemble."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 4))
@@ -615,6 +684,14 @@ def run(args):
         plot_concept_graphs(gdict, {n: state[d][n][0] for n in ("A", "B")},
                             os.path.join(args.out_dir, f"graph_{args.graph}_d{d:.3f}.png"),
                             title=f"{args.graph} graph" + (f" (k={k})" if args.graph == "mknn" else "") + f", depth={d:.3f}", augs=augs[d])
+
+        if args.graph == "mknn":
+            kn = {n: knn_directed(state[d][n][0], k) for n in ("A", "B")}
+            for n_, M_ in kn.items():
+                np.save(os.path.join(args.out_dir, f"adjacency_knn_directed_k{k}_d{d:.3f}_{n_}.npy"), M_.astype(np.uint8))
+            plot_knn_directed(kn, {n: state[d][n][0] for n in ("A", "B")},
+                              os.path.join(args.out_dir, f"graph_knn_directed_d{d:.3f}.png"),
+                              title=f"directed kNN (k={k}), depth={d:.3f}", augs=augs[d])
 
         res = results[d]
         res["pairs"], res["fracs"] = steer_pairs, fracs
