@@ -136,23 +136,24 @@ def centroid_similarity(cents):
 
 
 def _connect_components(A, S):
-    """Add the most-similar cross-component edge until the graph is connected. Returns (A, n_added)."""
-    A, added = A.copy(), 0
+    """Add the most-similar cross-component edge until the graph is connected. Returns (A_union, aug_mask)."""
+    A, aug = A.copy(), np.zeros_like(A)
     while True:
         n_comp, lab = connected_components(csr_matrix(A), directed=False)
         if n_comp == 1:
-            return A, added
+            return A, aug
         cross = lab[:, None] != lab[None, :]
         i, j = np.unravel_index(np.argmax(np.where(cross, S, -np.inf)), S.shape)
-        A[i, j] = A[j, i] = 1
-        added += 1
+        A[i, j] = A[j, i] = aug[i, j] = aug[j, i] = 1
 
 
 def mutual_knn_graph(cents, k, connect=True):
     """
     Undirected graph with edge i-j iff j is in kNN(i) AND i is in kNN(j) under centroid cosine similarity.
     Mutual kNN can leave nodes isolated or the graph disconnected; with connect=True the most similar
-    cross-component edges are added until every pair has a route. Returns (adjacency uint8, similarity, n_added).
+    cross-component edges are added until every pair has a route.
+    Returns (A_union, similarity, aug): A_union = mutual edges + artificial edges (used for routing);
+    aug = 0/1 mask of ONLY the artificial edges, so the pure mutual-kNN graph is A_union - aug.
     """
     S = centroid_similarity(cents)
     n = S.shape[0]
@@ -162,10 +163,10 @@ def mutual_knn_graph(cents, k, connect=True):
     knn = np.zeros((n, n), dtype=bool)
     knn[np.arange(n)[:, None], nn] = True
     A = (knn & knn.T).astype(np.uint8)
-    added = 0
+    aug = np.zeros_like(A)
     if connect:
-        A, added = _connect_components(A, S_off)
-    return A, S, added
+        A, aug = _connect_components(A, S_off)
+    return A, S, aug
 
 
 def joint_graph(A_a, A_b):
@@ -187,8 +188,15 @@ def graph_routes(adj, pairs):
     return routes
 
 
-def save_graph(adj, path, sim=None):
-    np.save(path, adj)
+def save_graph(adj, path, sim=None, aug=None):
+    """adj saved as given. With aug (artificial-edge mask): `path` holds the PURE mutual-kNN edges, plus
+    `_augmented.npy` (artificial edges only) and `_connected.npy` (union, what routing uses)."""
+    if aug is None:
+        np.save(path, adj)
+    else:
+        np.save(path, adj - aug)
+        np.save(path.replace(".npy", "_augmented.npy"), aug)
+        np.save(path.replace(".npy", "_connected.npy"), adj)
     if sim is not None:
         np.save(path.replace(".npy", "_similarity.npy"), sim)
 
@@ -417,7 +425,7 @@ def parse_args():
     return p.parse_args()
 
 
-def plot_concept_graphs(adjs, cents=None, out_png="graphs.png", title=None):
+def plot_concept_graphs(adjs, cents=None, out_png="graphs.png", title=None, augs=None):
     """
     adjs: {"A": adj, "B": adj, "joint": adj} (any subset); cents: {"A": (12,d), "B": (12,d)} optional.
     Top row: nodes on the true month ring; gray = ring edge, red = off-ring edge (the graph disagrees with the ring).
@@ -444,16 +452,22 @@ def plot_concept_graphs(adjs, cents=None, out_png="graphs.png", title=None):
             else:
                 ax.axis("off")
                 continue
+            G = np.asarray((augs or {}).get(nm, np.zeros_like(A))).astype(bool)   # artificial edges
             for i, k in zip(*np.nonzero(np.triu(A, 1))):
                 on = ring[i, k]
-                ax.plot(*xy[[i, k]].T, color="#999999" if on else "#d62728", lw=1.6 if on else 2.0, zorder=1)
+                if G[i, k]:   # added only to connect components: blue dashed, whether or not it is on the ring
+                    ax.plot(*xy[[i, k]].T, color="#1f77b4", lw=2.0, ls="--", zorder=1)
+                else:
+                    ax.plot(*xy[[i, k]].T, color="#999999" if on else "#d62728", lw=1.6 if on else 2.0, zorder=1)
             ax.scatter(*xy.T, s=260, color="white", edgecolor="black", zorder=2)
             for i in range(n):
                 ax.text(*xy[i], MONTHS[i][:3], ha="center", va="center", fontsize=7, zorder=3)
             ax.set_aspect("equal"); ax.axis("off")
             if r == 0:
-                n_e, n_off = int(A.sum() // 2), int((np.triu(A, 1) & ~ring).sum())
-                ax.set_title(f"{nm}: {n_e} edges, {n_off} off-ring" +
+                M = A & ~G   # mutual-kNN edges only
+                n_e, n_off, n_aug = int(M.sum() // 2), int((np.triu(M, 1) & ~ring).sum()), int(G.sum() // 2)
+                ax.set_title(f"{nm}: {n_e} mutual edges, {n_off} off-ring" +
+                             (f", +{n_aug} artificial (blue)" if n_aug else "") +
                              (f", {int(((~A) & ring).sum() // 2)} ring edges missing" if n_off or n_e < n else ""),
                              fontsize=9)
             else:
@@ -526,6 +540,7 @@ def run(args):
     state = {d: {} for d in depths}
     results = {d: {} for d in depths}
     adjs = {d: {} for d in depths}
+    augs = {d: {} for d in depths}
 
     for name, path in (("A", MODEL_A), ("B", MODEL_B)):
         tok, model = load(path)
@@ -547,14 +562,16 @@ def run(args):
             stem = f"d{d:.3f}_{name}"
             if args.graph == "ring":
                 adj = ring_graph()
+                aug = np.zeros_like(adj)
                 save_graph(adj, os.path.join(args.out_dir, f"adjacency_ring_{stem}.npy"))
             else:
-                adj, sim, added = mutual_knn_graph(cent, k)
-                save_graph(adj, os.path.join(args.out_dir, f"adjacency_mknn_k{k}_{stem}.npy"), sim)
-                print(f"{name} depth={d:.3f}: mKNN k={k}: {int(adj.sum() // 2)} edges"
-                      + (f" ({added} added to connect components)" if added else ""))
+                adj, sim, aug = mutual_knn_graph(cent, k)
+                save_graph(adj, os.path.join(args.out_dir, f"adjacency_mknn_k{k}_{stem}.npy"), sim, aug)
+                print(f"{name} depth={d:.3f}: mKNN k={k}: {int((adj - aug).sum() // 2)} mutual edges"
+                      + (f" + {int(aug.sum() // 2)} artificial edges added to connect components" if aug.any() else ""))
             routes = graph_routes(adj, steer_pairs)
             adjs[d][name] = adj
+            augs[d][name] = aug
             state[d][name] = (cent, manifold, routes)
 
             results[d][f"linear_steering_{name}"], results[d][f"manifold_steering_{name}"] = sweep(
@@ -583,7 +600,7 @@ def run(args):
     for d in depths:
         tag = f"{args.mode}_{args.graph}_d{d:.3f}"
         if args.graph == "mknn":
-            save_graph(joint_graph(adjs[d]["A"], adjs[d]["B"]),
+            save_graph(joint_graph(adjs[d]["A"] - augs[d]["A"], adjs[d]["B"] - augs[d]["B"]),
                        os.path.join(args.out_dir, f"adjacency_mknn_k{k}_d{d:.3f}_joint.npy"))
         # how often does each route equal the true shorter ring arc (ties at distance 6 excluded)?
         for name in ("A", "B"):
@@ -594,15 +611,16 @@ def run(args):
 
         gdict = dict(adjs[d])
         if args.graph == "mknn":
-            gdict["joint"] = joint_graph(adjs[d]["A"], adjs[d]["B"])
+            gdict["joint"] = joint_graph(adjs[d]["A"] - augs[d]["A"], adjs[d]["B"] - augs[d]["B"])
         plot_concept_graphs(gdict, {n: state[d][n][0] for n in ("A", "B")},
                             os.path.join(args.out_dir, f"graph_{args.graph}_d{d:.3f}.png"),
-                            title=f"{args.graph} graph" + (f" (k={k})" if args.graph == "mknn" else "") + f", depth={d:.3f}")
+                            title=f"{args.graph} graph" + (f" (k={k})" if args.graph == "mknn" else "") + f", depth={d:.3f}", augs=augs[d])
 
         res = results[d]
         res["pairs"], res["fracs"] = steer_pairs, fracs
         res["routes"] = {n: state[d][n][2] for n in ("A", "B")}
         res["mode"], res["graph"], res["depth"], res["adjacency"] = args.mode, args.graph, d, adjs[d]
+        res["artificial_edges"] = augs[d]
         torch.save(res, os.path.join(args.out_dir, f"months_results_{tag}.pt"))
         print(f"\n=== depth {d:.3f} ===")
         sweep_summary[d] = evaluate_steering_ensemble(
