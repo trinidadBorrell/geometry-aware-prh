@@ -471,7 +471,7 @@ def parse_args():
     p.add_argument("--k", type=int, default=None, help="K for mKNN. Default: default_k(dataset, n_nodes) (months: 2).")
     p.add_argument("--n-pairs", type=int, default=50)
     p.add_argument("--n-steps", type=int, default=50)
-    p.add_argument("--n-pca", type=int, default=8)
+    p.add_argument("--n-pca", type=int, default=32)
     p.add_argument("--layer-sweep", action="store_true",
                    help="repeat everything at depths 1/8 ... 8/8 of num_hidden_layers (8x the compute). "
                         "Default: single layer at LAYER_FRAC.")

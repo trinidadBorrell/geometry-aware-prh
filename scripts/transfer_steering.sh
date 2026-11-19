@@ -2,9 +2,9 @@
 pip install -r requirements.txt
 cd transferable_steering
 
-python run_steering.py --mode additive --graph mknn --out-dir /workspace/results/emily/steering_pca/additive_steering_transfer_mknn_pca_11 --n-pca 11
-python run_steering.py --mode additive --graph mknn --out-dir /workspace/results/emily/steering_pca/additive_steering_transfer_mknn_pca_32 --n-pca 32
-python run_steering.py --mode additive --graph mknn --out-dir /workspace/results/emily/steering_pca/additive_steering_transfer_mknn_pca_64 --n-pca 64
+python run_steering.py --mode additive --graph mknn --out-dir /workspace/results/emily/steering_layerwise --layer-sweep
+# python run_steering.py --mode additive --graph mknn --out-dir /workspace/results/emily/steering_pca/additive_steering_transfer_mknn_pca_32 --n-pca 32
+# python run_steering.py --mode additive --graph mknn --out-dir /workspace/results/emily/steering_pca/additive_steering_transfer_mknn_pca_64 --n-pca 64
 
 
 
