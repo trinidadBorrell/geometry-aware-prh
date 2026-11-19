@@ -1,5 +1,5 @@
 
-PROMPT_TEMPLATE = "Q: What month is {} months after{}?\nA:"
+PROMPT_TEMPLATE = "Q: What month is {} months after {}?\nA:"
 MONTHS = [
     'January', 
     'February', 

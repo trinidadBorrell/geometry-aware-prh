@@ -2,18 +2,18 @@
 pip install -r requirements.txt
 cd geometry_aware_convergence
 
-LLAMA3B_PATH=/workspace/hf/prh_llms/wit_1024/openlm-research_open_llama_3b_pool-avg.pt
-LLAMA7B_PATH=/workspace/hf/prh_llms/wit_1024/openlm-research_open_llama_7b_pool-avg.pt
+# LLAMA3B_PATH=/workspace/hf/prh_llms/wit_1024/openlm-research_open_llama_3b_pool-avg.pt
+# LLAMA7B_PATH=/workspace/hf/prh_llms/wit_1024/openlm-research_open_llama_7b_pool-avg.pt
 
-VITBASE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_base_patch14_dinov2.lvd142m_pool-cls.pt
-VITLARGE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_large_patch14_dinov2.lvd142m_pool-cls.pt
+# VITBASE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_base_patch14_dinov2.lvd142m_pool-cls.pt
+# VITLARGE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_large_patch14_dinov2.lvd142m_pool-cls.pt
 
-LLAMA3B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_3b/shard_0000.pt
-VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/shard_0000.pt
+# LLAMA3B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_3b/shard_0000.pt
+# VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/shard_0000.pt
 
 
-LLAMA7B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_7b/shard_0000.pt
-VITLARGE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_large_patch14_dinov2.lvd142m/shard_0000.pt
+# LLAMA7B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_7b/shard_0000.pt
+# VITLARGE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_large_patch14_dinov2.lvd142m/shard_0000.pt
 
 OUT_PATH="/workspace/results/emily/mutual_knn_all_k_model_type_ablation"
 
