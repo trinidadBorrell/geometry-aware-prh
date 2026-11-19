@@ -242,6 +242,38 @@ class Manifold:
 
 
 # --------------------------------------------------------------------------------------
+# Behavior manifold (paper, sec 2.2 / 3.2): output distributions over the 12 month tokens + "other",
+# averaged per correct answer, sqrt-embedded (Hellinger), joined by a periodic cubic spline.
+# --------------------------------------------------------------------------------------
+def with_other(P):
+    """(..., 12) month-token probabilities -> (..., 13) with the 'other' class = 1 - sum."""
+    P = np.asarray(P, dtype=np.float64)
+    return np.concatenate([P, np.clip(1 - P.sum(-1, keepdims=True), 0, None)], -1)
+
+
+def behavior_grid(probs, answers, n_grid=1440):
+    """
+    probs: (N, 12) UNINTERVENED month-token probabilities; answers: (N,) correct month ids.
+    Returns G (n_grid, 13): unit vectors sqrt(q(theta)) along the manifold, theta in [0, 12).
+    q = (spline value)^2, renormalised, so G is a valid point on the Hellinger sphere.
+    """
+    P13 = with_other(_np(probs))
+    ans = np.asarray(answers)
+    H = np.sqrt(np.stack([P13[ans == m].mean(0) for m in range(12)]))          # (12, 13) Hellinger centroids
+    cs = CubicSpline(np.arange(13), np.vstack([H, H[:1]]), bc_type="periodic")
+    S = cs(np.linspace(0, 12, n_grid, endpoint=False))
+    q = S ** 2
+    q /= q.sum(-1, keepdims=True)
+    return np.sqrt(q)
+
+
+def bc_distance(P13, G):
+    """d_BC(p, M) = -log max_theta sum_i sqrt(p_i) sqrt(q_i(theta)).  P13: (..., 13), G: (n_grid, 13)."""
+    bc = np.sqrt(P13) @ G.T
+    return -np.log(np.clip(bc.max(-1), 1e-12, 1.0))
+
+
+# --------------------------------------------------------------------------------------
 # Steering. One hook helper, four public methods: {linear, manifold} x {additive, replace}
 # --------------------------------------------------------------------------------------
 @torch.no_grad()
@@ -332,10 +364,8 @@ METHODS = {
 CONDITIONS = {
     "linear_steering_A":       ("linear A→A",           "#1f77b4", "-"),
     "linear_steering_B":       ("linear B→B",           "#1f77b4", "--"),
-    "linear_transfer_naive":   ("linear A→B (naive)",   "#1f77b4", ":"),
     "manifold_steering_A":     ("manifold A→A",         "#d95f02", "-"),
     "manifold_steering_B":     ("manifold B→B",         "#d95f02", "--"),
-    "manifold_transfer_naive": ("manifold A→B (naive)", "#d95f02", ":"),
     "manifold_route_transfer": ("manifold A-route→B",   "#2ca02c", "-."),
 }
 
@@ -358,6 +388,10 @@ def evaluate_steering_ensemble(results, out_png="months_steering.png", title=Non
       d_intended expected circular distance to the intended arc position x + f*delta, always measured against
                  the TRUE month ring (so a graph route that leaves the ring is penalised)
       off_mass   1 - sum of month-token probabilities (fluency check)
+      energy     d_BC(gamma(f), M): Bhattacharyya distance from the steered output distribution (12 months + other)
+                 to the behavior manifold of the SAME model (results["behavior_grid"][A|B]); the paper's
+                 cumulative output energy is its integral over f (trapezoid), reported as E_BC(path).
+                 Lower = outputs stay on distributions the model produces naturally.
     """
     pairs, fracs = results["pairs"], np.asarray(results["fracs"])
     xs = np.array([x for x, _ in pairs])
@@ -380,23 +414,33 @@ def evaluate_steering_ensemble(results, out_png="months_steering.png", title=Non
         D = _circ(months[None, None, :], u[:, :, None])
         d_intended = (Pn * D[:, :, None, :]).sum(-1).mean(-1)
         off_mass = (1 - mass).mean(-1)
-        summary[key] = dict(p_target=p_target, d_intended=d_intended, off_mass=off_mass, p_source0=p_source0)
+        energy = None
+        if "behavior_grid" in results:
+            G = results["behavior_grid"]["A" if key.endswith("_A") else "B"]
+            P13 = with_other(T)                                                                  # (P, S, n, 13)
+            energy = np.stack([bc_distance(P13[i], G).mean(-1) for i in range(P)])              # (P, S)
+        trap = getattr(np, "trapezoid", None) or np.trapz
+        summary[key] = dict(p_target=p_target, d_intended=d_intended, off_mass=off_mass, p_source0=p_source0,
+                            energy=energy, path_energy=None if energy is None else trap(energy, fracs, axis=1))
 
     def ms(a):
         return f"{a.mean():.3f}±{a.std(ddof=1) / np.sqrt(len(a)):.3f}"
 
-    print(f"{'condition':24s} {'P(src)@f=0':>13s} {'P(tgt)@f=1':>13s} {'d_intended(mean f)':>20s} {'off_mass@f=.5':>15s} {'off_mass@f=1':>14s}")
+    print(f"{'condition':24s} {'P(src)@f=0':>13s} {'P(tgt)@f=1':>13s} {'d_intended(mean f)':>20s} {'off_mass@f=.5':>15s} {'off_mass@f=1':>14s} {'E_BC(path)':>13s}")
     mid = int(np.argmin(np.abs(fracs - 0.5)))
     for key, s in summary.items():
         print(f"{CONDITIONS[key][0]:24s} {ms(s['p_source0']):>13s} {ms(s['p_target'][:, -1]):>13s} "
-              f"{ms(s['d_intended'].mean(1)):>20s} {ms(s['off_mass'][:, mid]):>15s} {ms(s['off_mass'][:, -1]):>14s}")
+              f"{ms(s['d_intended'].mean(1)):>20s} {ms(s['off_mass'][:, mid]):>15s} {ms(s['off_mass'][:, -1]):>14s} "
+              f"{(ms(s['path_energy']) if s['path_energy'] is not None else 'n/a'):>13s}")
     print("mean ± s.e.m. over pairs. Under replacement, f=0 overwrites the prompt with the SOURCE centroid (linear: whole "
           "residual; manifold: subspace only), so P(src)@f=0 is not the unsteered value and need not match between "
           "linear and manifold.")
 
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
     panels = [("p_target", "P(target month)"), ("d_intended", "expected circ. dist to intended position"),
               ("off_mass", "mass off month tokens")]
+    if "behavior_grid" in results:
+        panels.append(("energy", "d_BC to behavior manifold (lower = on-manifold)"))
+    fig, axes = plt.subplots(1, len(panels), figsize=(4.7 * len(panels), 4))
     for ax, (m, ttl) in zip(axes, panels):
         for key, s in summary.items():
             label, c, ls = CONDITIONS[key]
@@ -550,10 +594,12 @@ def plot_knn_directed(knns, cents=None, out_png="knn_directed.png", title=None, 
 
 def plot_layer_sweep(sweep_summary, depths, out_png):
     """sweep_summary[depth][cond] = summary dict from evaluate_steering_ensemble."""
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
     panels = [("p_target", "P(target) at f=1", lambda s: s["p_target"][:, -1].mean()),
               ("d_intended", "d_intended (mean over f)", lambda s: s["d_intended"].mean()),
               ("off_mass", "off-month mass at f=1", lambda s: s["off_mass"][:, -1].mean())]
+    if all(s["path_energy"] is not None for d in depths for s in sweep_summary[d].values()):
+        panels.append(("energy", "E_BC(path), lower = on-manifold", lambda s: s["path_energy"].mean()))
+    fig, axes = plt.subplots(1, len(panels), figsize=(4.7 * len(panels), 4))
     for ax, (_, ttl, fn) in zip(axes, panels):
         for key, (label, c, ls) in CONDITIONS.items():
             ys = [fn(sweep_summary[d][key]) for d in depths if key in sweep_summary[d]]
@@ -610,6 +656,7 @@ def run(args):
     results = {d: {} for d in depths}
     adjs = {d: {} for d in depths}
     augs = {d: {} for d in depths}
+    bgrids = {d: {} for d in depths}
 
     for name, path in (("A", MODEL_A), ("B", MODEL_B)):
         tok, model = load(path)
@@ -624,6 +671,7 @@ def run(args):
                 print(f"[warn] {name} layer {layer} is below 50% on the task; steering results will be hard to interpret")
 
             cent = centroids(acts, answers)
+            bgrids[d][name] = behavior_grid(p, answers)
             manifold = Manifold(cent, acts=acts, n_pca=args.n_pca)
             print(f"{name} depth={d:.3f}: {args.n_pca} PCA dims capture {manifold.captured:.3f} of centroid variance")
             del acts
@@ -647,11 +695,7 @@ def run(args):
                 tok, model, layer, month_ids, cent, manifold, routes)
 
             if name == "B":
-                cA, mA, rA = state[d]["A"]
-                assert cA.shape[1] == model.config.hidden_size, "d_model must be the same for naive transfer"
-                results[d]["linear_transfer_naive"], results[d]["manifold_transfer_naive"] = sweep(
-                    tok, model, layer, month_ids, cA, mA, rA)
-
+                rA = state[d]["A"][2]
                 rB = state[d]["B"][2]
                 n_diff = sum(a != b for a, b in zip(rA, rB))
                 print(f"depth={d:.3f}: A's route differs from B's own route for {n_diff}/{len(rA)} pairs")
@@ -698,6 +742,7 @@ def run(args):
         res["routes"] = {n: state[d][n][2] for n in ("A", "B")}
         res["mode"], res["graph"], res["depth"], res["adjacency"] = args.mode, args.graph, d, adjs[d]
         res["artificial_edges"] = augs[d]
+        res["behavior_grid"] = bgrids[d]
         torch.save(res, os.path.join(args.out_dir, f"months_results_{tag}.pt"))
         print(f"\n=== depth {d:.3f} ===")
         sweep_summary[d] = evaluate_steering_ensemble(
