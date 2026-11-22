@@ -2,24 +2,24 @@
 pip install -r requirements.txt
 cd geometry_aware_convergence
 
-# LLAMA3B_PATH=/workspace/hf/prh_llms/wit_1024/openlm-research_open_llama_3b_pool-avg.pt
-# LLAMA7B_PATH=/workspace/hf/prh_llms/wit_1024/openlm-research_open_llama_7b_pool-avg.pt
+LLAMA3B_PATH=/workspace/hf/prh_llms/wit_1024/openlm-research_open_llama_3b_pool-avg.pt
+LLAMA7B_PATH=/workspace/hf/prh_llms/wit_1024/openlm-research_open_llama_7b_pool-avg.pt
 
-# VITBASE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_base_patch14_dinov2.lvd142m_pool-cls.pt
-# VITLARGE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_large_patch14_dinov2.lvd142m_pool-cls.pt
+VITBASE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_base_patch14_dinov2.lvd142m_pool-cls.pt
+VITLARGE_PATH=/workspace/hf/prh_vlms/prh/wit_1024/vit_large_patch14_dinov2.lvd142m_pool-cls.pt
 
-# LLAMA3B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_3b/shard_0000.pt
-# VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/shard_0000.pt
+LLAMA3B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_3b/shard_0000.pt
+VITBASE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_base_patch14_dinov2.lvd142m/shard_0000.pt
 
 
-# LLAMA7B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_7b/shard_0000.pt
-# VITLARGE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_large_patch14_dinov2.lvd142m/shard_0000.pt
+LLAMA7B_PATH_BIG=/workspace/hf/wit_1m/shards/openlm-research_open_llama_7b/shard_0000.pt
+VITLARGE_PATH_BIG=/workspace/hf/wit_1m/shards/vit_large_patch14_dinov2.lvd142m/shard_0000.pt
 
-OUT_PATH="/workspace/results/emily/mutual_knn_all_k_model_type_ablation"
+OUT_PATH="/workspace/results/emily/mutual_knn_all_k_random_weights"
 
 NUM_PERMS=${NUM_PERMS:-200}
 
-python measure_alignment.py --modality_x language --modality_y vision  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS" --output_dir "$OUT_PATH"
+# python measure_alignment.py --modality_x language --modality_y vision  --metric mutual_knn_all_k --num-permutations "$NUM_PERMS" --output_dir "$OUT_PATH"
 
 # OUT_PATH="/workspace/results/emily/nc_metrics_1025_streamline"
 
@@ -41,31 +41,34 @@ python measure_alignment.py --modality_x language --modality_y vision  --metric 
 # python distance_metric_alignment.py --input_file_x "$LLAMA3B_PATH_BIG" --input_file_y "$VITBASE_PATH_BIG" --output_dir "$OUT_PATH" --normalize
 
 
-# FEATS=/workspace/hf
-# # RESULTS=/workspace/results/emily
-# LLM=openlm-research_open_llama_3b
-# LVM=vit_base_patch14_dinov2.lvd142m
+FEATS=/workspace/hf
+# RESULTS=/workspace/results/emily
+LLM=openlm-research_open_llama_3b
+LVM=vit_base_patch14_dinov2.lvd142m
 
-# LLAMA3B=openlm-research_open_llama_3b
-# LLAMA7B=openlm-research_open_llama_7b
+LLAMA3B=openlm-research_open_llama_3b
+LLAMA7B=openlm-research_open_llama_7b
 
-# VITBASE=vit_base_patch14_dinov2.lvd142m
-# VITLARGE=vit_large_patch14_dinov2.lvd142m
+VITBASE=vit_base_patch14_dinov2.lvd142m
+VITLARGE=vit_large_patch14_dinov2.lvd142m
 
-# # "x_file|y_file|output_dir" per dataset
-# SETTINGS=(
-#     "$LLAMA3B_PATH|$VITBASE_PATH|$OUT_PATH"
-#     "$LLAMA3B_PATH|$VITLARGE_PATH|$OUT_PATH"
-#     "$LLAMA7B_PATH|$VITBASE_PATH|$OUT_PATH"
-#     "$LLAMA7B_PATH|$VITLARGE_PATH|$OUT_PATH"
-#     # 10k pair: all-k + null on every layer pair is very expensive at this N; enable only deliberately
-#     # "$LLAMA3B_PATH_BIG|$VITBASE_PATH_BIG|$OUT_PATH"
-# )
+# "x_file|y_file|output_dir" per dataset
+SETTINGS=(
+    "$LLAMA3B_PATH|$VITBASE_PATH|$OUT_PATH"
+    "$LLAMA3B_PATH|$VITLARGE_PATH|$OUT_PATH"
+    "$LLAMA7B_PATH|$VITBASE_PATH|$OUT_PATH"
+    "$LLAMA7B_PATH|$VITLARGE_PATH|$OUT_PATH"
+    # 10k pair: all-k + null on every layer pair is very expensive at this N; enable only deliberately
+    # "$LLAMA3B_PATH_BIG|$VITBASE_PATH_BIG|$OUT_PATH"
+)
 
-# align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
-#     local x=$1 y=$2 out=$3; shift 3
-#     python measure_alignment.py --input_file_x "$x" --input_file_y "$y" --output_dir "$out" "$@"
-# }
+align() {  # align X_FILE Y_FILE OUT_DIR [extra measure_alignment args]
+    local x=$1 y=$2 out=$3; shift 3
+    python measure_alignment.py --input_file_x "$x" --input_file_y "$y" --output_dir "$out" "$@"
+}
+
+align "$LLAMA3B_PATH" "$VITBASE_PATH" "$OUT_PATH"  --metric mutual_knn_all_k
+
 
 # sweep() {  # sweep METRIC FLAG VALUE...  (baseline + null-calibrated, both datasets)
 #     local metric=$1 flag=$2; shift 2

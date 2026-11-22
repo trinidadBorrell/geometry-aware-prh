@@ -19,11 +19,15 @@ def prepare_features(feats, q=0.95, exact=False):
     Returns:
         feats: a torch tensor of the same shape as the input
     """
+    # TODO: Revert changes later
     if isinstance(feats, torch.Tensor):
         feats = metrics.remove_outliers(feats.float(), q=q, exact=exact)
-        return feats.cuda()
+        # return feats.cuda()
+
+        return torch.rand_like(feats).cuda()
     elif isinstance(feats, list):
-        return [metrics.remove_outliers(f.float(), q=q, exact=exact).cuda() for f in feats]
+        # return [metrics.remove_outliers(f.float(), q=q, exact=exact).cuda() for f in feats]
+        return [torch.rand_like(metrics.remove_outliers(f.float(), q=q, exact=exact)).cuda() for f in feats]
     else:
         raise ValueError(f"Unsupported input type for prepare_features: {type(feats)}")
 
