@@ -1,5 +1,7 @@
 import argparse
+import copy
 import gc
+import inspect
 import itertools
 import os
 
@@ -15,7 +17,7 @@ from scipy.sparse.csgraph import connected_components, shortest_path
 
 import torch
 from datasets import Dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from tasks.months import MONTHS, get_months_dataset
 
@@ -25,6 +27,7 @@ MODEL_A = "meta-llama/Meta-Llama-3.1-8B"  # Model A
 MODEL_B = "meta-llama/Llama-3.1-70B"
 LAYER_FRAC = 0.875
 DATASET = "months"
+BATCH = 32          # prompts per forward pass; set from --batch-size in run()
 
 # Ground-truth neighbours per node for each dataset (months: a ring => 2). Used as the default K for mKNN.
 DATASET_K = {"months": 2}
@@ -33,13 +36,42 @@ DATASET_K = {"months": 2}
 # --------------------------------------------------------------------------------------
 # Model / data plumbing (unchanged)
 # --------------------------------------------------------------------------------------
-def load(name, device="cuda"):
+def resolve_quant(quant, name):
+    """auto: 4-bit for 70B-class checkpoints (bf16 weights ~141 GB), bf16 otherwise."""
+    if quant == "auto":
+        return "4bit" if "70b" in name.lower() else "none"
+    return quant
+
+
+def load(name, device=0, quant="none"):
+    """
+    quant: none (bf16) | 8bit | 4bit (NF4). Weights go to GPU `device` only ({"": device}); if they do not fit
+    this raises an OOM instead of silently offloading to CPU, which would make the sweep impractically slow.
+    Hooks on model.model.layers[i] work unchanged on quantized models; centroids, graphs and steering all come from
+    the SAME (quantized) model, so they stay self-consistent.
+    """
     tok = AutoTokenizer.from_pretrained(name)
     tok.padding_side = "left"
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    model = AutoModelForCausalLM.from_pretrained(name, torch_dtype=torch.bfloat16, device_map=device).eval()
+    kw = dict(torch_dtype=torch.bfloat16, device_map={"": device})
+    if quant == "4bit":
+        kw["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True)
+    elif quant == "8bit":
+        kw["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+    model = AutoModelForCausalLM.from_pretrained(name, **kw).eval()
     return tok, model
+
+
+def _keep_kw(model):
+    """Ask the LM head for the last position only: the full (B, T, vocab) logits are ~1 GB per 32-prompt batch."""
+    params = inspect.signature(model.forward).parameters
+    for k in ("logits_to_keep", "num_logits_to_keep"):   # name depends on the transformers version
+        if k in params:
+            return {k: 1}
+    return {}
 
 
 def layer_index(model, frac=LAYER_FRAC):
@@ -65,12 +97,13 @@ def build_dataset():
 
 
 @torch.no_grad()
-def run_model(tok, model, texts, layer, month_ids, batch_size=32):
+def run_model(tok, model, texts, layer, month_ids, batch_size=None):
     """
     Returns
       acts:  (N, d)  residual stream after decoder layer `layer`, at the last token
       probs: (N, 12) P(first token = month m), from the full-vocab softmax (rows sum to <= 1)
     """
+    batch_size = batch_size or BATCH
     store = {}
 
     def hook(_module, _inp, out):
@@ -82,7 +115,7 @@ def run_model(tok, model, texts, layer, month_ids, batch_size=32):
     try:
         for i in range(0, len(texts), batch_size):
             enc = tok(texts[i:i + batch_size], return_tensors="pt", padding=True).to(model.device)
-            logits = model(**enc).logits[:, -1, :].float()
+            logits = model(**enc, use_cache=False, **_keep_kw(model)).logits[:, -1, :].float()
             acts.append(store["h"])
             probs.append(torch.softmax(logits, -1)[:, month_ids.to(logits.device)].cpu())
     finally:
@@ -277,51 +310,98 @@ def bc_distance(P13, G):
 # --------------------------------------------------------------------------------------
 # Steering. One hook helper, four public methods: {linear, manifold} x {additive, replace}
 # --------------------------------------------------------------------------------------
+class PrefixedPrompts:
+    """
+    Prompts with the key-value cache of everything EXCEPT the last token already computed (one pass, no edit).
+    The steering edit only touches the last position's residual, and causal attention means earlier positions never
+    see it, so every (route, f) needs just a one-token forward against this cache instead of a full-prompt forward.
+    Cache size ~ n_prompts * (T-1) * per-token KV (Llama-70B: ~0.31 MB/token). The cache is independent of the
+    steering layer. It is cropped back after each use so it can be reused.
+    """
+
+    def __init__(self, tok, model, texts, batch_size=None):
+        batch_size = batch_size or BATCH
+        self.batches = []
+        with torch.no_grad():
+            for i in range(0, len(texts), batch_size):
+                enc = tok(texts[i:i + batch_size], return_tensors="pt", padding=True).to(model.device)
+                ids, mask = enc["input_ids"], enc["attention_mask"]
+                plen = ids.shape[1] - 1
+                # base model only (no lm_head); no hook is registered yet, so nothing is edited here
+                cache = model.model(input_ids=ids[:, :-1], attention_mask=mask[:, :-1], use_cache=True).past_key_values
+                self.batches.append((cache, ids[:, -1:], mask, plen))
+
+
 @torch.no_grad()
-def _steer(tok, model, texts, layer, edit, month_ids, batch_size=32):
-    """Apply edit(h_last) -> h_last_new at the last token of decoder layer `layer`; return month-token probs."""
+def _steer(tok, model, texts, layer, edit, month_ids, batch_size=None):
+    """
+    Apply edit(h_last) -> h_last_new at the last token of decoder layer `layer`; return month-token probs.
+    `texts` is a list of prompts (full forward) or a PrefixedPrompts (one-token forward on a cached prefix).
+    """
+    batch_size = batch_size or BATCH
     month_ids = month_ids.to(model.device)
 
     def hook(_module, _inp, out):
         h = out[0] if isinstance(out, tuple) else out
-        h = h.clone()
-        h[:, -1, :] = edit(h[:, -1, :])
-        return (h,) + tuple(out[1:]) if isinstance(out, tuple) else h
+        h[:, -1, :] = edit(h[:, -1, :])    # in place (no autograd): avoids cloning the whole (B, T, d) activation
 
     handle = model.model.layers[layer].register_forward_hook(hook)
     probs = []
     try:
-        for i in range(0, len(texts), batch_size):
-            enc = tok(texts[i:i + batch_size], return_tensors="pt", padding=True).to(model.device)
-            logits = model(**enc).logits[:, -1, :].float()
-            probs.append(torch.softmax(logits, -1)[:, month_ids].cpu())
+        if isinstance(texts, PrefixedPrompts):
+            for cache, last_ids, mask, plen in texts.batches:
+                c = cache if hasattr(cache, "crop") else copy.deepcopy(cache)
+                logits = model(input_ids=last_ids, attention_mask=mask, past_key_values=c, use_cache=True,
+                               **_keep_kw(model)).logits[:, -1, :].float()
+                if hasattr(cache, "crop"):
+                    cache.crop(plen)       # drop the token just appended, so the cache can be reused
+                probs.append(torch.softmax(logits, -1)[:, month_ids].cpu())
+        else:
+            for i in range(0, len(texts), batch_size):
+                enc = tok(texts[i:i + batch_size], return_tensors="pt", padding=True).to(model.device)
+                logits = model(**enc, use_cache=False, **_keep_kw(model)).logits[:, -1, :].float()
+                probs.append(torch.softmax(logits, -1)[:, month_ids].cpu())
     finally:
         handle.remove()
     return torch.cat(probs)
 
 
-def steer_linear_additive(tok, model, texts, layer, cent_src, cent_tgt, f, month_ids, batch_size=32):
+def verify_prefix_cache(tok, model, texts, layer, month_ids, tol=0.1):
+    """One-off safety check: cached and full-forward steering must agree (bf16 noise only), twice in a row."""
+    g = torch.Generator().manual_seed(0)
+    vec = torch.randn(model.config.hidden_size, generator=g)
+    edit = lambda hl: hl + vec.to(device=hl.device, dtype=hl.dtype)
+    ref = _steer(tok, model, texts, layer, edit, month_ids)
+    pc = PrefixedPrompts(tok, model, texts)
+    got1 = _steer(tok, model, pc, layer, edit, month_ids)
+    got2 = _steer(tok, model, pc, layer, edit, month_ids)       # reuse: catches a cache that was not cropped back
+    d1, d2 = (ref - got1).abs().max().item(), (ref - got2).abs().max().item()
+    print(f"prefix-cache check: max |p_cached - p_full| = {d1:.4f} (first use), {d2:.4f} (reuse); tol {tol}")
+    assert d1 < tol and d2 < tol, "cached steering disagrees with the full forward; rerun with --no-prefix-cache"
+
+
+def steer_linear_additive(tok, model, texts, layer, cent_src, cent_tgt, f, month_ids, batch_size=None):
     """h <- h + f * (c_tgt - c_src). Keeps everything the prompt carries."""
     vec = torch.as_tensor(cent_tgt - cent_src, dtype=torch.float32)
     return _steer(tok, model, texts, layer, lambda hl: hl + (f * vec).to(device=hl.device, dtype=hl.dtype),
                   month_ids, batch_size)
 
 
-def steer_linear_replace(tok, model, texts, layer, cent_src, cent_tgt, f, month_ids, batch_size=32):
+def steer_linear_replace(tok, model, texts, layer, cent_src, cent_tgt, f, month_ids, batch_size=None):
     """h <- (1 - f) c_src + f c_tgt. The WHOLE last-token residual is overwritten (paper's linear baseline)."""
     point = torch.as_tensor((1 - f) * cent_src + f * cent_tgt, dtype=torch.float32)
     return _steer(tok, model, texts, layer, lambda hl: point.to(device=hl.device, dtype=hl.dtype).expand_as(hl),
                   month_ids, batch_size)
 
 
-def steer_manifold_additive(tok, model, texts, layer, manifold, route, f, month_ids, batch_size=32):
+def steer_manifold_additive(tok, model, texts, layer, manifold, route, f, month_ids, batch_size=None):
     """h <- h + (path(f) - path(0)), path = spline through the centroids on `route`; lives in the PCA subspace."""
     vec = torch.as_tensor((manifold.z_at(route, f) - manifold.z_at(route, 0.0)) @ manifold.W, dtype=torch.float32)
     return _steer(tok, model, texts, layer, lambda hl: hl + vec.to(device=hl.device, dtype=hl.dtype),
                   month_ids, batch_size)
 
 
-def steer_manifold_replace(tok, model, texts, layer, manifold, route, f, month_ids, batch_size=32):
+def steer_manifold_replace(tok, model, texts, layer, manifold, route, f, month_ids, batch_size=None):
     """
     Replace only the PCA-subspace coordinates with path(f); keep the prompt's remainder r = h - mu - W^T W (h - mu):
         h <- mu + W^T z_path(f) + r  =  h + (z_path(f) - z_prompt) W,   z_prompt = W (h - mu)
@@ -342,7 +422,7 @@ def steer_manifold_replace(tok, model, texts, layer, manifold, route, f, month_i
 
 
 def steer_manifold_route_transfer(tok, model, texts, layer, manifold_tgt, route_src, f, month_ids,
-                                  mode="replace", batch_size=32):
+                                  mode="replace", batch_size=None):
     """
     Route transfer A -> B. `route_src` is the shortest route between the two concepts in MODEL A's graph (node ids =
     concept names, which are shared across models). Model B then builds its OWN spline through ITS OWN centroids
@@ -476,6 +556,11 @@ def parse_args():
     p.add_argument("--layer-sweep", action="store_true",
                    help="repeat everything at depths 1/8 ... 8/8 of num_hidden_layers (8x the compute). "
                         "Default: single layer at LAYER_FRAC.")
+    p.add_argument("--quant", choices=["auto", "none", "8bit", "4bit"], default="auto",
+                   help="weight precision for each model. auto: 4-bit for *70B*, bf16 otherwise.")
+    p.add_argument("--batch-size", type=int, default=32, help="prompts per forward pass; lower it if activations OOM.")
+    p.add_argument("--no-prefix-cache", action="store_true",
+                   help="disable the cached-prefix steering path (slower; full prompt re-run for every step).")
     p.add_argument("--out-dir", default=".")
     return p.parse_args()
 
@@ -616,6 +701,9 @@ def plot_layer_sweep(sweep_summary, depths, out_png):
 
 
 def run(args):
+    global BATCH
+    BATCH = args.batch_size
+    args.prefix_cache = not args.no_prefix_cache
     os.makedirs(args.out_dir, exist_ok=True)
     steer_linear, steer_manifold = METHODS[args.mode]
     depths = [i / 8 for i in range(1, 9)] if args.layer_sweep else [LAYER_FRAC]
@@ -635,22 +723,34 @@ def run(args):
 
     k = args.k if args.k is not None else default_k(DATASET, 12)
 
+    def prompts_for(tok, model, x):
+        return PrefixedPrompts(tok, model, src_texts[x]) if args.prefix_cache else src_texts[x]
+
+    def by_source(tok, model, fn):
+        """Run fn(pair_index, x, y, prompts) for every pair, grouped by source month so each source's prefix cache
+        is built once and freed before the next. Returns per-pair results in the original pair order."""
+        out = [None] * len(steer_pairs)
+        for x in sorted({x for x, _ in steer_pairs}):
+            pr = prompts_for(tok, model, x)
+            for i, (xx, y) in enumerate(steer_pairs):
+                if xx == x:
+                    out[i] = fn(i, x, y, pr)
+            del pr
+            gc.collect()
+            torch.cuda.empty_cache()
+        return out
+
     def sweep(tok, model, layer, month_ids, cent, manifold, routes):
-        lin_all, man_all = [], []
-        for (x, y), route in zip(steer_pairs, routes):
-            for f in fracs:
-                lin_all.append(steer_linear(tok, model, src_texts[x], layer, cent[x], cent[y], f, month_ids))
-                man_all.append(steer_manifold(tok, model, src_texts[x], layer, manifold, route, f, month_ids))
-        shape = (args.n_pairs, len(fracs), n_src, 12)
-        return torch.stack(lin_all).reshape(shape), torch.stack(man_all).reshape(shape)
+        res = by_source(tok, model, lambda i, x, y, pr: (
+            torch.stack([steer_linear(tok, model, pr, layer, cent[x], cent[y], f, month_ids) for f in fracs]),
+            torch.stack([steer_manifold(tok, model, pr, layer, manifold, routes[i], f, month_ids) for f in fracs])))
+        return torch.stack([r[0] for r in res]), torch.stack([r[1] for r in res])      # (P, S, n_src, 12) each
 
     def route_transfer_sweep(tok, model, layer, month_ids, manifold_B, routes_A):
-        out = []
-        for (x, y), route in zip(steer_pairs, routes_A):
-            for f in fracs:
-                out.append(steer_manifold_route_transfer(tok, model, src_texts[x], layer, manifold_B, route, f,
-                                                         month_ids, mode=args.mode))
-        return torch.stack(out).reshape(args.n_pairs, len(fracs), n_src, 12)
+        res = by_source(tok, model, lambda i, x, y, pr: torch.stack([
+            steer_manifold_route_transfer(tok, model, pr, layer, manifold_B, routes_A[i], f, month_ids, mode=args.mode)
+            for f in fracs]))
+        return torch.stack(res)
 
     # keyed by depth: state[d][name] = (cents, manifold, routes);  results[d] = {cond: tensor}
     state = {d: {} for d in depths}
@@ -660,8 +760,12 @@ def run(args):
     bgrids = {d: {} for d in depths}
 
     for name, path in (("A", MODEL_A), ("B", MODEL_B)):
-        tok, model = load(path)
+        tok, model = load(path, quant=resolve_quant(args.quant, path))
         month_ids = month_token_ids(tok)
+        print(f"{name} ({path}): {torch.cuda.memory_allocated() / 1e9:.1f} GB on GPU after load, "
+              f"quant={resolve_quant(args.quant, path)}")
+        if args.prefix_cache:
+            verify_prefix_cache(tok, model, src_texts[0][:8], layer_index(model, depths[0]), month_ids)
 
         for d in depths:
             layer = layer_index(model, d)
@@ -706,9 +810,11 @@ def run(args):
                     results[d]["manifold_route_transfer"] = route_transfer_sweep(
                         tok, model, layer, month_ids, state[d]["B"][1], rA)
 
+        print(f"{name}: peak GPU memory {torch.cuda.max_memory_allocated() / 1e9:.1f} GB")
         del model, tok
         gc.collect()
         torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
 
     sweep_summary = {}
     for d in depths:
