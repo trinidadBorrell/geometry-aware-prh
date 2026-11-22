@@ -21,7 +21,8 @@ from tasks.months import MONTHS, get_months_dataset
 
 
 MODEL_A = "meta-llama/Meta-Llama-3.1-8B"  # Model A
-MODEL_B = "Qwen/Qwen3-8B-Base"            # Model B
+# MODEL_B = "Qwen/Qwen3-8B-Base"            # Model B
+MODEL_B = "meta-llama/Llama-3.1-70B"
 LAYER_FRAC = 0.875
 DATASET = "months"
 
