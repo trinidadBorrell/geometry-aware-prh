@@ -65,6 +65,11 @@ def load(name, device=0, quant="none"):
     return tok, model
 
 
+def _cache_kw(model):
+    """Name of the forward() argument that takes the KV cache (renamed `cache` in newer transformers)."""
+    return "cache" if "cache" in inspect.signature(model.forward).parameters else "past_key_values"
+
+
 def _keep_kw(model):
     """Ask the LM head for the last position only: the full (B, T, vocab) logits are ~1 GB per 32-prompt batch."""
     params = inspect.signature(model.forward).parameters
@@ -328,7 +333,8 @@ class PrefixedPrompts:
                 ids, mask = enc["input_ids"], enc["attention_mask"]
                 plen = ids.shape[1] - 1
                 # base model only (no lm_head); no hook is registered yet, so nothing is edited here
-                cache = model.model(input_ids=ids[:, :-1], attention_mask=mask[:, :-1], use_cache=True).past_key_values
+                out = model.model(input_ids=ids[:, :-1], attention_mask=mask[:, :-1], use_cache=True)
+                cache = out.past_key_values if hasattr(out, "past_key_values") else out.cache
                 self.batches.append((cache, ids[:, -1:], mask, plen))
 
 
@@ -351,10 +357,10 @@ def _steer(tok, model, texts, layer, edit, month_ids, batch_size=None):
         if isinstance(texts, PrefixedPrompts):
             for cache, last_ids, mask, plen in texts.batches:
                 c = cache if hasattr(cache, "crop") else copy.deepcopy(cache)
-                logits = model(input_ids=last_ids, attention_mask=mask, past_key_values=c, use_cache=True,
+                logits = model(input_ids=last_ids, attention_mask=mask, **{_cache_kw(model): c}, use_cache=True,
                                **_keep_kw(model)).logits[:, -1, :].float()
                 if hasattr(cache, "crop"):
-                    cache.crop(plen)       # drop the token just appended, so the cache can be reused
+                    cache.crop(-1)         # drop the one token just appended (negative = remove, in old and new versions)
                 probs.append(torch.softmax(logits, -1)[:, month_ids].cpu())
         else:
             for i in range(0, len(texts), batch_size):
