@@ -847,8 +847,14 @@ def run_factor_stream(
     resume: dict[str, Any] | None = None,
     record_indices: bool = False,
     on_checkpoint: Any = None,
+    init_raw: list[tuple[np.ndarray, np.ndarray]] | None = None,
 ) -> dict[str, Any]:
-    """Quarter-gallery fit. Validation excess selects checkpoints. Test rows are not accepted."""
+    """Quarter-gallery fit. Validation excess selects checkpoints. Test rows are not accepted.
+
+    ``init_raw`` replaces the identity or perturbed start with factors that are
+    projected into this family before the first step. The default start is unchanged
+    when it is omitted. Checkpoint selection still ignores test scores.
+    """
     if family not in FAMILIES or mode not in MODES:
         raise ValueError((family, mode))
     if family_block(family) not in (0, 1) and int(basis_a["q"]) % family_block(family) != 0:
@@ -887,6 +893,8 @@ def run_factor_stream(
     selected_parts: list[dict[str, Any]] | None = None
 
     if family == "exp_s":
+        if init_raw is not None:
+            raise ValueError("init_raw is only implemented for factor families")
         tensors = _init_exp(q, init_seed, pert_scale, mode, rho) if resume is None else None
         factor_params = None
         parts: list[dict[str, Any]] | None = None
@@ -894,7 +902,15 @@ def run_factor_stream(
     else:
         tensors = None
         if resume is None:
-            parts, raw = _shrink_init(family, mode, rho, q, init_seed, pert_scale)
+            if init_raw is not None:
+                seeded = [(np.array(a, dtype=np.float64, copy=True), np.array(h, dtype=np.float64, copy=True)) for a, h in init_raw]
+                got = realize_state(seeded, family, mode, rho)
+                if got is None:
+                    raise RuntimeError("init_raw is outside the feasible set")
+                parts, _alpha = got
+                raw = _raw_from_stored(parts, mode)
+            else:
+                parts, raw = _shrink_init(family, mode, rho, q, init_seed, pert_scale)
             factor_params = _as_params(raw, family)
         else:
             factor_params = None

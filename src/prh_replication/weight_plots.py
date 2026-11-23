@@ -98,7 +98,7 @@ def partner_group(partner: str) -> str:
 
 
 def model_meta(manifest: dict, key: str) -> dict[str, Any]:
-    for block in ("base_panel", "supplementary_qwen3x", "vision_anchors"):
+    for block in ("base_panel", "supplementary_olmo", "supplementary_qwen3x", "vision_anchors"):
         for row in manifest.get(block, []):
             if row["key"] == key:
                 return {

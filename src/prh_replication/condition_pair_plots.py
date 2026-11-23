@@ -103,6 +103,13 @@ def pair_label(side_a: str, side_b: str) -> str:
     return f"{SHORT.get(side_a, side_a)}\n{SHORT.get(side_b, side_b)}"
 
 
+def relative_to_identity(values: list[float], baseline: float) -> list[float]:
+    """Fractional gain (excess − identity) / identity. Identity itself is 0."""
+    if not values or not np.isfinite(baseline) or baseline == 0.0:
+        return []
+    return [(float(value) - baseline) / baseline for value in values]
+
+
 def plot_conditions_by_pair(
     plt,
     rows: list[dict],
@@ -128,22 +135,38 @@ def plot_conditions_by_pair(
             for group in range(0, len(pairs), 3):
                 if (group // 3) % 2 == 1:
                     ax.axvspan(group - 0.5, min(group + 3, len(pairs)) - 0.5, color="#f3f4f6", zorder=0)
-        for index, (mode, label, color) in enumerate(MODES):
-            offset = (index - (len(MODES) - 1) / 2) * width
+        learned = [mode for mode in MODES if mode[0] != "identity"]
+        ax.axhline(0.0, color="#4d4d4d", lw=1.0, zorder=1, label="Identity")
+        for index, (mode, label, color) in enumerate(learned):
+            offset = (index - (len(learned) - 1) / 2) * width
             medians = []
             for pair_i, pair in enumerate(pairs):
-                vals = mode_values(
+                baseline_vals = mode_values(
                     rows,
                     kind=kind,
                     family=family,
                     profile=profile,
-                    mode=mode,
+                    mode="identity",
                     rho=rho,
                     pair=pair,
                     field=field,
                 )
+                baseline = float(baseline_vals[0]) if baseline_vals else float("nan")
+                vals = relative_to_identity(
+                    mode_values(
+                        rows,
+                        kind=kind,
+                        family=family,
+                        profile=profile,
+                        mode=mode,
+                        rho=rho,
+                        pair=pair,
+                        field=field,
+                    ),
+                    baseline,
+                )
                 medians.append(float(np.median(vals)) if vals else np.nan)
-                if mode != "identity" and vals:
+                if vals:
                     ax.scatter(
                         np.full(len(vals), x[pair_i] + offset),
                         vals,
@@ -160,19 +183,20 @@ def plot_conditions_by_pair(
                 label=label,
                 zorder=2,
             )
-        ax.set_ylabel("Holdout excess CKA")
+        ax.set_ylabel("Excess over that pair's identity")
         ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
         ax.set_title(f"{title},  ρ = {rho:g}")
         ax.set_axisbelow(True)
         ax.yaxis.grid(True, color="#e5e5e5", linewidth=0.6)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-    top = max(ax.get_ylim()[1] for ax in axes)
-    axes[0].set_ylim(0, top * 1.08)
+    lo = min(ax.get_ylim()[0] for ax in axes)
+    hi = max(ax.get_ylim()[1] for ax in axes)
+    axes[0].set_ylim(min(0.0, lo), hi * 1.08 if hi > 0 else hi)
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, ncol=4, frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.0))
     axes[1].set_xticks(x, [pair_label(*pair) for pair in pairs], fontsize=7.5)
-    axes[1].set_xlabel("Bars are seed medians. Dots are the three fit seeds. Identity is M = I and has one score.")
+    axes[1].set_xlabel("Zero is that pair's identity excess. Bars are seed medians of (excess − identity) / identity. Dots are the three seeds.")
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     _write(fig, path)
 

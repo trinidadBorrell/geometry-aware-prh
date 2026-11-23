@@ -57,8 +57,8 @@ def rank_family(manifest: dict, keys: list[str]) -> dict[str, int]:
     for k in keys:
         row = next(
             r
-            for block in ("base_panel", "supplementary_qwen3x")
-            for r in manifest[block]
+            for block in ("base_panel", "supplementary_olmo", "supplementary_qwen3x")
+            for r in manifest.get(block, [])
             if r["key"] == k
         )
         dt = parse_release_date(row.get("public_release_date"))

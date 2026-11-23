@@ -24,6 +24,8 @@ Compatibility symlinks keep the usual top-level `configs/`, `scripts/`, and `tes
 5. **Extracted-diagonal ablation** — `run_cca_metric_diagonal_ablation.py` / `cca_metric_diagonal_ablation_v1.json`
 6. **Feature vs PCA metric / caption×metric 2×2** — `run_feature_vs_pca_metric.py` / `feature_vs_pca_metric_v1.json`
 7. **Procedure replication** (new pairs + Flickr30k) — `run_cca_reliability_replication.py` / `cca_reliability_replication_v1.json` (+ `extract_cca_reliability_replication_features.py`)
+8. **Caption-penalised CCA** (\(A_X(\lambda)=C_X+\lambda W+\tau_X I\)) — `run_caption_penalised_cca.py` / `caption_penalised_cca_v1.json` · write-up `CAPTION_PENALISED_CCA_RESULTS.md`
+9. **Frozen caption-penalty transfer** (COCO↔Flickr) — `run_caption_penalty_transfer.py` / `caption_penalty_transfer_v1.json` · `CAPTION_PENALTY_TRANSFER_RESULTS.md`
 
 Results live on the work disk under `results/<experiment_id>/` (gitignored).
 
@@ -36,6 +38,7 @@ Results live on the work disk under `results/<experiment_id>/` (gitignored).
 - `cca_metric_diagonal_ablation.py` / `cca_metric_diagonal_ablation_study.py`
 - `feature_vs_pca_metric.py` / `feature_vs_pca_metric_study.py`
 - `cca_reliability_replication.py` / `cca_reliability_replication_study.py`
+- `caption_penalised_cca.py` / `caption_penalised_cca_study.py` — \(A_X(\lambda)=C_X+\lambda W+\tau_X I\)
 - `feature_prep.py` — clip / L2-prep helpers
 - `spectral_calibration.py` — CKA/mKNN scoring helpers used by the above
 

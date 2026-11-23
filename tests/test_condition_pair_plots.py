@@ -7,7 +7,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from prh_replication.condition_pair_plots import mode_values, ordered_pairs, plot_conditions_by_pair
+from prh_replication.condition_pair_plots import mode_values, ordered_pairs, plot_conditions_by_pair, relative_to_identity
 
 
 def _row(kind, side_a, side_b, family, profile, mode, rho, excess, seed=0):
@@ -52,6 +52,14 @@ def test_mode_values_use_identity_once_and_median_of_seeds():
     learned = mode_values(rows, kind="vl", family="exp_s", profile="na", mode="a_only", rho=0.1, pair=pair)
     assert learned == [0.10, 0.50, 0.20]
     assert mode_values(rows, kind="vl", family="exp_s", profile="na", mode="a_only", rho=0.4, pair=pair) == [0.90]
+
+
+def test_relative_to_identity_is_fractional_gain():
+    got = relative_to_identity([0.40, 0.50], 0.30)
+    assert abs(got[0] - (0.10 / 0.30)) < 1e-12
+    assert abs(got[1] - (0.20 / 0.30)) < 1e-12
+    assert relative_to_identity([0.30], 0.30) == [0.0]
+    assert relative_to_identity([0.40], 0.0) == []
 
 
 def test_plot_writes_png(tmp_path):
