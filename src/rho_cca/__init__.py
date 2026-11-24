@@ -7,6 +7,7 @@ model, a result directory, or an experiment runner.
 
 from rho_cca.cca import RhoCCAConfig, RhoCCAFit, fit_rho_cca
 from rho_cca.cka import CKAScore, linear_cka, linear_cka_from_feature_grams, shared_neighbour_fraction
+from rho_cca.datasets import resolve_dataset
 from rho_cca.extract import hashed_embedding
 from rho_cca.io import load_fit, save_fit
 from rho_cca.providers import ArrayProvider, MapExtractor, collect_pair
@@ -62,6 +63,7 @@ __all__ = [
     "linear_cka_from_feature_grams",
     "load_fit",
     "match_norm",
+    "resolve_dataset",
     "save_fit",
     "shared_neighbour_fraction",
     "split_groups",
