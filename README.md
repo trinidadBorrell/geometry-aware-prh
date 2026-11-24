@@ -64,17 +64,18 @@ See `examples/frozen_partner.py` and `examples/steering_transport.py`.
 | Path | Role |
 | --- | --- |
 | `src/rho_cca/` | Importable package |
-| `tests/test_library_*.py` | Default pytest suite |
+| `tests/test_library_*.py`, `tests/acceptance/` | Default pytest suite |
 | `examples/` | Runnable public-API examples |
 | `experiments/` | Optional cached and historical replays |
 | `docs/conventions.md` | Row, penalty, weight, and displacement rules |
 | `docs/PROVENANCE.md` | Map back to `angus-prh-replication` |
 
-`python -m pytest tests -q` collects only `test_library_*.py`, so a checkout
-that also contains older research tests does not run them by accident. The
-suite is CPU-only and does not load a model. PyTorch is imported only inside
-`preblock_rows`.
+`python -m pytest tests -q` collects `test_library_*.py` and
+`test_acceptance_*.py`. Older research tests under other names stay out of
+that run. The suite is CPU-only and does not load a model. PyTorch is imported
+only inside `preblock_rows`. Numerical status is in `docs/ACCEPTANCE.md`.
 
 Historical Flickr, nocaps, IMDb, and Moonlight numbers are optional and are
-not claimed by the default tests. Commands and the missing-artifact behaviour
-are in `experiments/README.md`.
+not claimed by the default tests. Dataset paths are arguments to
+`experiments/fetch_datasets.py`. An omitted path is not downloaded unless
+`--download` is set. Commands are in `experiments/README.md`.

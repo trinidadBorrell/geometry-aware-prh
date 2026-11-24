@@ -1,7 +1,30 @@
 # Optional reproductions
 
 These scripts call `rho_cca`. They are not part of `python -m pytest tests`.
-None of them downloads data or generates text.
+`fetch_datasets.py` downloads only when `--download` is passed, and only into
+`--cache`. It does not generate text.
+
+## Dataset locations
+
+Pass a directory or file you already have. Omitting a path does not download.
+Add `--download` to store omitted datasets in `--cache` (default
+`~/.cache/rho-cca/datasets`). An incomplete cache directory is not overwritten.
+
+```bash
+python experiments/fetch_datasets.py \
+  --coco-images /data/coco/val2017 \
+  --coco-captions /data/coco/annotations/captions_val2017.json \
+  --flickr-captions /data/flickr/dataset_flickr30k.json \
+  --flickr-images /data/flickr/flickr30k_images \
+  --nocaps /data/nocaps \
+  --imdb /data/aclImdb
+```
+
+`--only flickr-captions nocaps` limits the set. COCO images are the val2017 zip, COCO captions are
+`annotations_trainval2017.zip`, Flickr captions are the Karpathy
+`caption_datasets.zip`, Flickr images use the Kaggle CLI for
+`eeshawn/flickr30k`, nocaps is the Hugging Face set `lmms-lab-encoder/NoCaps`,
+and IMDb is Stanford `aclImdb_v1.tar.gz`.
 
 ## Cached fixture
 
@@ -31,6 +54,26 @@ Those runs live on the geometry work tree, not in this package. Point
 `RHO_CCA_ARTIFACT_ROOT` at the parent of those result directories. The current
 script reports `not-run` until a feature adapter for the saved galleries is
 added. It does not rescore a JSON summary and call that a reproduction.
+
+```bash
+python experiments/replay_cached.py
+RHO_CCA_ARTIFACT_ROOT=/path/to/results python experiments/replay_cached.py
+```
+
+`RHO_CCA_ARTIFACT_ROOT` is the parent of `frozen_partner_cka_audit_v1` and
+`rho_cca_nocaps_frozen_partner_v1`. Without the feature galleries the
+historical rows stay `not-run`.
+
+Application of one archived steering run, without refitting and without
+generation:
+
+```bash
+python experiments/replay_moonlight_application.py \
+  --artifact-root /path/to/results
+```
+
+The root is the parent of `imdb_matched_pair_cca_transfer_v1` and
+`imdb_cca_moonlight_third_model_v1`. A missing directory is `not-run`.
 
 IMDb matched-pair transfer, Moonlight attachment, multifamily consensus, and
 the layer-13 retention run also need saved activations or generations.

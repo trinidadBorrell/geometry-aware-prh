@@ -23,6 +23,6 @@ include = ["rho_cca*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_library_*.py"]
+python_files = ["test_library_*.py", "test_acceptance_*.py"]
 pythonpath = ["src"]
 addopts = "-q"
