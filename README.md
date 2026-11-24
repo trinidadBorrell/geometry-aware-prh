@@ -63,6 +63,7 @@ See `examples/frozen_partner.py` and `examples/steering_transport.py`.
 
 | Path | Role |
 | --- | --- |
+| `ONBOARDING.md` | API, conventions, and validation workflow |
 | `src/rho_cca/` | Importable package |
 | `tests/test_library_*.py`, `tests/acceptance/` | Default pytest suite |
 | `examples/` | Runnable public-API examples |
@@ -73,7 +74,13 @@ See `examples/frozen_partner.py` and `examples/steering_transport.py`.
 `python -m pytest tests -q` collects `test_library_*.py` and
 `test_acceptance_*.py`. Older research tests under other names stay out of
 that run. The suite is CPU-only and does not load a model. PyTorch is imported
-only inside `preblock_rows`. Numerical status is in `docs/ACCEPTANCE.md`.
+only inside `preblock_rows`.
+
+Numerical acceptance checks reproduce archived ridge and ρ-CCA fits on cached
+PCA representations, held-out alignment scores, and steering-vector transport
+through saved maps. Full model extraction, preprocessing and behavioural
+reproduction are optional experiment workflows. What version 0.1.0 verifies
+is recorded in `docs/ACCEPTANCE.md`.
 
 Historical Flickr, nocaps, IMDb, and Moonlight numbers are optional and are
 not claimed by the default tests. Dataset paths are arguments to
