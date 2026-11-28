@@ -1,6 +1,6 @@
 # exp-031: does the PRH capability trend need word order? (shuffled captions through PRH's 10 LLMs)
 
-**Status:** done, 2026-11-28 (pod run at commit 6d4d3e5, RTX PRO 4500, about 2.7 h, about $2) · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-031-shuffled-capability/` (copy in local `results/exp-031-shuffled-capability/`); shuffled features in `/workspace/activations/<llm>/layer_XX/*_tf-shufw{0,1}.pt` · **Code:** `extract.py`, `analyze.py`, `infra/runpod/run_exp031.sh`, `tests/test_exp031_shuffle.py`; `geoprh.activation_cache.Variant.transform` and `prh_calibration --text-transform / --text-root / --llms`
+**Status:** done, 2026-11-28 (PRH pool: pod run at 6d4d3e5, about 2.7 h, about $2; 5 newer LLMs: f7de431, about 1 h, about $0.7) · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-031-shuffled-capability/` (copy in local `results/exp-031-shuffled-capability/`); shuffled features in `/workspace/activations/<llm>/layer_XX/*_tf-shufw{0,1}.pt` · **Code:** `extract.py`, `analyze.py`, `infra/runpod/run_exp031.sh`, `tests/test_exp031_shuffle.py`; `geoprh.activation_cache.Variant.transform` and `prh_calibration --text-transform / --text-root / --llms`
 
 ## Result in one paragraph
 
@@ -186,10 +186,58 @@ All base models. Same pipeline and conditions (reext, shufw0, shufw1) on one GPU
 - Extraction: intact bpb 1.616, shuffled 2.418 (96% of captions changed).
 - Scoring through `--llms` against the 4 local ViTs. Mutual 10-NN excess: intact 0.084-0.128, shuffled 0.057-0.087. CKA: 0.233-0.345 intact, 0.151-0.260 shuffled. Same pattern as PRH's pool: shuffled is lower in every pair but keeps most of the level.
 
+**Gemma-2's high bpb is not a pipeline artefact.**
+- Gemma-2-9B's bpb is the highest of the new LLMs, on intact (2.07) and shuffled captions (3.21; others 2.35-2.59).
+- Gemma-2-2B on 256 WIT-1024 captions (pod GPU) gives 2.113-2.114 in every setting: one caption at a time or left-padded batches of 16, eager or SDPA attention, bf16 or fp32. Padding, the attention path and precision do not move it.
+- Gemma-2 simply predicts these short captions worse. It stays in the analysis with its measured bpb.
+
 **Readouts:**
 - Do the new families sit on the same lines?
 - Does G keep tracking capability over 15 LLMs and 6 families, with a flat shuffled curve?
 - Do the answers hold on both capability axes?
+
+### Extension results (2026-11-28, pod `747sospdwed1fq`, commit f7de431; seed 0 only, as decided)
+
+**Run:** RTX PRO 4500, 11:21-12:13 UTC, about $0.7. Terminated and verified (404). All five LLMs passed or were covered by the layer-0 check (Qwen2.5-1.5B, Llama-3.2-3B, Gemma-2-9B: min row cosine 1.000). 255 pairs per condition. With seed 1 not covering every LLM, `analyze.py` uses seed 0 for all 15.
+
+**New LLMs:**
+
+| LLM | bpb, PRH | bpb, all tokens | shuffled bpb | mKNN intact | mKNN shuffled | G | CKA intact | CKA shuffled |
+|---|---|---|---|---|---|---|---|---|
+| Qwen2.5-1.5B | 1.615 | 1.966 | 2.42 | 0.098 | 0.067 | 0.031 | 0.232 | 0.167 |
+| Qwen2.5-7B | 1.512 | 1.837 | 2.35 | 0.108 | 0.071 | 0.038 | 0.215 | 0.147 |
+| Llama-3.2-3B | 1.716 | 1.716 | 2.59 | 0.118 | 0.079 | 0.039 | 0.221 | 0.142 |
+| Llama-3.1-8B | 1.647 | 1.647 | 2.55 | 0.131 | 0.084 | 0.046 | 0.236 | 0.150 |
+| Gemma-2-9B | 2.066 | 2.066 | 3.21 | 0.131 | 0.079 | 0.052 | 0.238 | 0.146 |
+
+(Mean excess over the 17 ViTs.) Intact > shuffled in 255/255 pairs on both measures.
+
+**1. PRH's bpb stops predicting alignment once modern families are in.** Over 15 LLMs, Spearman(1 - bpb, intact excess) is 0.39 on mutual 10-NN (PRH 10: 0.93) and 0.36 on CKA. Two causes:
+- Qwen2.5 has the lowest PRH bpb but aligns at BLOOMZ level. Its tokenizer adds no BOS, so its bpb skips the first token. Scored fully, it moves from 1.51-1.62 to 1.84-1.97, next to BLOOMZ.
+- Gemma-2-9B has the highest bpb of the modern models (2.07; not a pipeline artefact, see above) but aligns like the best LLaMA models (0.131).
+
+**2. On the all-token axis, PRH's pattern holds over the new families except Gemma.**
+
+| LLMs | axis | mKNN ρ: I / S / G | CKA ρ: I / S / G |
+|---|---|---|---|
+| PRH 10 | PRH bpb | 0.93 / 0.77 / 0.94 | 0.67 / 0.01 / 0.90 |
+| PRH 10 | all-token bpb | 0.96 / 0.81 / 0.96 | 0.59 / -0.20 / 0.85 |
+| all 15 | PRH bpb | 0.39 / 0.21 / 0.42 | 0.36 / 0.16 / 0.43 |
+| all 15 | all-token bpb | 0.75 / 0.72 / 0.73 | 0.57 / -0.10 / 0.72 |
+| 14, no Gemma | all-token bpb | 0.96 / 0.78 / 0.95 | 0.65 / -0.15 / 0.88 |
+
+Slopes over 15 on the all-token axis: mKNN I 0.063, S 0.020, G 0.045; CKA I 0.084, S -0.004, G 0.077. On mutual 10-NN, shuffled alignment still orders the LLMs much like intact, but with a small slope. On CKA, the shuffled trend is absent on every axis.
+
+**3. What distinguishes LLMs needs order, independent of any capability axis.**
+- Across all 15 LLMs, per ViT, intact alignment ranks the LLMs like the order gain G (median Spearman 0.95 mKNN, 0.87 CKA) more than like the shuffled alignment (0.76, 0.62).
+- Shuffled, the 15 LLMs (5 families, 0.56B-13B, 2022-2024) sit within mKNN 0.066-0.084; intact they spread over 0.085-0.132.
+- Within the new families, the bigger model gains more in G than in S: Qwen2.5 1.5B to 7B, G 0.031 to 0.038, S 0.067 to 0.071; Llama-3 3B to 8B, G 0.039 to 0.046, S 0.079 to 0.084.
+
+**Reading.**
+- The paper's capability claim should rest on point 3, which needs no capability axis: LLMs differ in alignment mainly through the part that needs word order.
+- Point 2 says that where bpb is a fair measure, this part is also what tracks capability.
+- Point 1 is a caution about PRH's evidence: the bpb-alignment trend depends on how bpb is computed and on which families are in the pool.
+- Gemma-2 is the case to understand: worse at predicting these captions, yet among the best aligned, and with the largest order gain.
 
 ## Run plan
 

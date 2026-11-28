@@ -476,11 +476,19 @@ def main() -> None:
     a.out.mkdir(parents=True, exist_ok=True)
     (a.out / "summary.md").write_text("\n".join(lines))
     (a.out / "trends.json").write_text(json.dumps(res, indent=2))
-    plot(a.out, llms, cap, fams, ex)
+    # x axis: all-token bpb when available (comparable across tokenizers), else PRH's bpb
+    if "capability_all_tokens" in res:
+        x, xlab = (
+            np.array(res["capability_all_tokens"]),
+            "1 - bits per byte, every caption token scored",
+        )
+    else:
+        x, xlab = cap, "1 - bits per byte (intact captions)"
+    plot(a.out, llms, x, fams, ex, xlab)
     print("\n".join(lines))
 
 
-def plot(out: Path, llms, cap, fams, ex) -> None:
+def plot(out: Path, llms, cap, fams, ex, xlabel: str) -> None:
     """Per LLM: mean excess over ViTs against 1 - bpb; band = min..max over ViTs for every
     series; marker = family."""
     fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), constrained_layout=True)
@@ -499,7 +507,7 @@ def plot(out: Path, llms, cap, fams, ex) -> None:
                     ms=4,
                 )
         ax.set_title(name, fontsize=10)
-        ax.set_xlabel("1 - bits per byte (intact captions)")
+        ax.set_xlabel(xlabel)
         ax.set_ylabel("excess over chance")
         ax.grid(alpha=0.25, lw=0.5)
     handles = [
