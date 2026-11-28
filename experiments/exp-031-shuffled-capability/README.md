@@ -1,6 +1,6 @@
 # exp-031: does the PRH capability trend need word order? (shuffled captions through PRH's 10 LLMs)
 
-**Status:** done, 2026-11-28 (pod run at commit 6d4d3e5, RTX PRO 4500, about 2.7 h, about $2) · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-031-shuffled-capability/` (copy in local `results/exp-031-shuffled-capability/`); shuffled features in `/workspace/activations/<llm>/layer_XX/*_tf-shufw{0,1}.pt` · **Code:** `extract.py`, `analyze.py`, `slopes.py`, `infra/runpod/run_exp031.sh`, `tests/test_exp031_shuffle.py`; `geoprh.activation_cache.Variant.transform` and `prh_calibration --text-transform / --text-root / --llms`
+**Status:** done, 2026-11-28 (pod run at commit 6d4d3e5, RTX PRO 4500, about 2.7 h, about $2) · **Owner:** oddharak · **Outputs:** `/workspace/results/oddharak/exp-031-shuffled-capability/` (copy in local `results/exp-031-shuffled-capability/`); shuffled features in `/workspace/activations/<llm>/layer_XX/*_tf-shufw{0,1}.pt` · **Code:** `extract.py`, `analyze.py`, `infra/runpod/run_exp031.sh`, `tests/test_exp031_shuffle.py`; `geoprh.activation_cache.Variant.transform` and `prh_calibration --text-transform / --text-root / --llms`
 
 ## Result in one paragraph
 
@@ -95,23 +95,35 @@ The first pod attempt stopped at the cache check. Re-extracted intact bloomz-560
 
 ## Results (WIT-1024, 10 LLMs x 17 ViTs)
 
-Full tables: `results/exp-031-shuffled-capability/summary.md`; figure `fig_trend.png`; slopes `slopes.json`.
+Full tables: `results/exp-031-shuffled-capability/summary.md` and `trends.json`; figure `fig_trend.png`.
 
-**Trend, Spearman(1 - bpb, excess), median (min to max) over ViTs:**
+G = I - mean(S0, S1) is the alignment that needs word order (the "order gain"). It is a difference of scores, read only for its trend. Its level is not evidence of image-relevant order information: in exp-030's toy, intact minus shuffled is about 0.055 mutual 10-NN even when order carries no image information.
 
-| measure | intact | shuffled seed 0 | shuffled seed 1 |
+**Trend over the 10 LLMs, per ViT, median (min to max) over ViTs:**
+
+| measure | condition | Spearman(1 - bpb, excess) | slope on 1 - bpb |
 |---|---|---|---|
-| Mutual 10-NN | 0.93 (0.88-0.95) | 0.77 (0.35-0.88) | 0.78 (0.70-0.85) |
-| Linear CKA | 0.67 (0.13-0.72) | 0.01 (-0.82-0.21) | 0.03 (-0.77-0.21) |
+| Mutual 10-NN | intact | 0.93 (0.88-0.95) | 0.115 |
+| Mutual 10-NN | shuffled s0 / s1 | 0.77 (0.35-0.88) / 0.78 (0.70-0.85) | 0.034 / 0.034 |
+| Mutual 10-NN | order gain G | 0.94 (0.85-0.99) | 0.083 |
+| Linear CKA | intact | 0.67 (0.13-0.72) | 0.170 |
+| Linear CKA | shuffled s0 / s1 | 0.01 (-0.82-0.21) / 0.03 (-0.77-0.21) | 0.004 / 0.009 |
+| Linear CKA | order gain G | 0.90 (0.56-0.96) | 0.145 |
 
-**Size of the trend (`slopes.py`), median over ViTs:**
+Shuffled captions keep 29% of the intact slope on mutual 10-NN and 9% on CKA (per-ViT ratio, median); the order gain carries the other 71% and 91%.
 
-| measure | condition | slope, all 10 LLMs | slope, within BLOOMZ | LLaMA-type minus BLOOMZ |
-|---|---|---|---|---|
-| Mutual 10-NN | intact | 0.115 | 0.064 | 0.033 |
-| Mutual 10-NN | shuffled s0 / s1 | 0.034 / 0.035 | 0.050 / 0.054 | 0.008 / 0.009 |
-| Linear CKA | intact | 0.170 | 0.011 | 0.053 |
-| Linear CKA | shuffled s0 / s1 | 0.004 / 0.009 | -0.019 / -0.036 | 0.003 / 0.006 |
+**Within vs between families** (slope; within = pooled over families with >= 2 LLMs, family means removed; between = over the 3 family means):
+
+| measure | condition | within-family | between-family |
+|---|---|---|---|
+| Mutual 10-NN | intact | 0.066 | 0.123 |
+| Mutual 10-NN | shuffled (mean) | 0.052 | 0.029 |
+| Mutual 10-NN | order gain G | 0.022 | 0.095 |
+| Linear CKA | intact | 0.001 | 0.181 |
+| Linear CKA | shuffled (mean) | -0.037 | 0.007 |
+| Linear CKA | order gain G | 0.043 | 0.163 |
+
+The size trend within a family is mostly kept by shuffled captions (mKNN: 0.052 of 0.066). The trend between families is mostly order gain (0.095 of 0.123; CKA 0.163 of 0.181). The share of alignment that survives shuffling falls with capability: 0.77-0.79 for BLOOMZ, 0.61-0.65 for the LLaMA-type models (Spearman with 1 - bpb -0.90 on both measures).
 
 **Levels:** intact > shuffled in 170/170 pairs on both measures and both seeds. Median excess: mutual 10-NN 0.113 intact vs 0.077 shuffled; CKA 0.217 vs 0.144-0.149. Shuffled mutual 10-NN per LLM is flat across the LLaMA-type models (0.078-0.085), against 0.124-0.132 intact.
 
@@ -129,10 +141,55 @@ Full tables: `results/exp-031-shuffled-capability/summary.md`; figure `fig_trend
 | seeds | S0 vs S1 median Spearman differ by 0.01 (mKNN) and 0.02 (CKA) | ok |
 
 **Reading.**
-- The cross-family part of PRH's capability trend depends on word order: LLaMA-type models beat BLOOMZ because of how they use order, not because of better word knowledge.
-- The within-BLOOMZ size trend is mostly lexical.
-- Most of the absolute alignment level survives shuffling, well above exp-023's TF-IDF floor (about 0.035). Unlike on WIT-10k (exp-026), order-free LLM features keep much of PRH's local alignment on WIT-1024.
+- **Level vs trend.** The order-free part of each LLM's representation carries most of the alignment (about 70%, twice exp-023's TF-IDF floor of 0.035) but little of the capability trend. The trend lives in the order gain, which tracks capability as closely as total alignment on mutual 10-NN (0.94 vs 0.93) and more closely on CKA (0.90 vs 0.67): the lexical part adds model-to-model variation unrelated to capability (e.g. bloomz-1b1's high CKA).
+- **External lexical baselines cannot show this.** They are one constant per ViT, so they cannot change a ranking of LLMs (exp-023's 0.93 to 0.92). The same LLM on shuffled words is the baseline that can.
+- **Between vs within.** The order-dependent trend is mostly between families (LLaMA-type vs BLOOMZ); the size trend within BLOOMZ is mostly lexical. With three families, two of them LLaMA-architecture, "capability" here is largely "BLOOMZ vs LLaMA-type". The extension below adds three families to test this.
+- **What "needs order" means.** Shuffled captions are still contextualised (every token attends to the others); what they lose is order. Two readings fit the gain: (a) order-dependent composition carries image-relevant structure, which better LMs extract better; (b) better LMs encode the same words more precisely in well-formed text, and shuffling puts every model out of distribution (bpb 2.50-2.68 for all). This experiment does not separate them; exp-030's conditional permutation test does.
+- Most of the absolute alignment level survives shuffling. Unlike on WIT-10k (exp-026), order-free LLM features keep much of PRH's local alignment on WIT-1024.
 - Limit: shuffled text is out of distribution, so the order effect here is an upper bound (see "Limits known in advance"). Family and size are confounded with the training data, as in PRH.
+
+## Extension: three newer families (2026-11-28)
+
+**Why:** the order-dependent trend above is mostly a contrast between BLOOMZ and LLaMA-type models. Newer families with much lower bpb test whether it holds beyond that one contrast.
+
+**Models (5):**
+
+| model | repo used | why this repo |
+|---|---|---|
+| Qwen2.5-1.5B, Qwen2.5-7B | `Qwen/Qwen2.5-*` | official, ungated |
+| Llama-3.2-3B | `unsloth/Llama-3.2-3B` | ungated copy of Meta's base weights |
+| Llama-3.1-8B | `NousResearch/Meta-Llama-3.1-8B` | ungated copy; Gröger et al.'s pool also uses NousResearch Llama-3 |
+| Gemma-2-9B | `unsloth/gemma-2-9b` | ungated copy of Google's base weights |
+
+All base models. Same pipeline and conditions (reext, shufw0, shufw1) on one GPU; old rows are not recomputed (GPU differences do not move scores, see the reproduction above).
+
+**Pipeline changes:**
+- Gemma-2 runs with eager attention: transformers 4.57's SDPA path drops Gemma-2's attention-logit soft-capping.
+- Tokenizers keep their defaults, as in PRH, for the features.
+- `prh_calibration --llms` accepts LLMs outside the "val" modelset; their info comes from their intact re-extraction (`_tf-reext`).
+- `analyze.py` reads their bpb from `extract.jsonl`, reports PRH's 10 and all LLMs separately, adds the order gain G, slopes and the within / between-family split; the pre-registered verdicts stay on PRH's 10.
+
+**Found while preparing: PRH's bpb is not comparable across tokenizers.**
+- platonic-rep scores each token from the position before it. Tokenizers that add no BOS (BLOOMZ, Qwen2.5) therefore leave the first caption token unscored, and on short captions that token carries many bits.
+- Local measurements on WIT-1024 (`extract.py bpb`):
+
+| model | bpb, PRH default | bpb, every token scored (EOS prepended) |
+|---|---|---|
+| bloomz-560m | 2.076 (= stored) | 2.283 |
+| Qwen2.5-1.5B | 1.616 | 1.966 |
+
+- PRH's own capability axis thus favours BLOOMZ by about 0.2 bpb against the LLaMA-type models, which score every token. That bias works against the BLOOMZ-LLaMA gap, so it does not create PRH's trend. For Qwen2.5 it is decisive: by default it sits next to llama-7b, scored fully next to BLOOMZ.
+- The run computes both values for the five BLOOMZ models and every new LLM (`bpb.jsonl`; the other families add a BOS, so both values agree). `analyze.py` reports the trends on both capability axes.
+
+**Local smoke test (2026-11-28, Qwen2.5-1.5B, laptop GPU):**
+- Layer 0 under a token shuffle: min row cosine 1.000.
+- Extraction: intact bpb 1.616, shuffled 2.418 (96% of captions changed).
+- Scoring through `--llms` against the 4 local ViTs. Mutual 10-NN excess: intact 0.084-0.128, shuffled 0.057-0.087. CKA: 0.233-0.345 intact, 0.151-0.260 shuffled. Same pattern as PRH's pool: shuffled is lower in every pair but keeps most of the level.
+
+**Readouts:**
+- Do the new families sit on the same lines?
+- Does G keep tracking capability over 15 LLMs and 6 families, with a flat shuffled curve?
+- Do the answers hold on both capability axes?
 
 ## Run plan
 

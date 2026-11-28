@@ -152,8 +152,13 @@ def test_analysis_separates_a_trend_from_none(tmp_path, monkeypatch):
     )
     an.main()
     res = json.loads((out / "trends.json").read_text())
-    assert res["trends"]["I/mutual_knn_k10"]["median"] > 0.9
-    assert abs(res["trends"]["S0/mutual_knn_k10"]["median"]) < 0.9
+    t = res["trends"]
+    assert t["PRH 10/I/mutual_knn_k10"]["median"] > 0.9
+    assert abs(t["PRH 10/S0/mutual_knn_k10"]["median"]) < 0.9
+    # the order gain (intact - shuffled) carries the trend; shuffled keeps none of the slope
+    assert t["PRH 10/G/mutual_knn_k10"]["median"] > 0.9
+    assert abs(res["slopes"]["PRH 10/S_share_of_I/mutual_knn_k10"]) < 0.5
+    assert set(res["within_between"]["G/cka_lin"]) == {"within", "between"}
     assert res["wins"]["S0/mutual_knn_k10"] == len(llms) * len(lvms)
     assert res["depth"][f"{llms[0]}/I/cka_lin"] == pytest.approx(1.0)
     verdict = {(v[0], v[1]): v[3] for v in res["verdicts"]}
@@ -161,13 +166,58 @@ def test_analysis_separates_a_trend_from_none(tmp_path, monkeypatch):
     assert (out / "fig_trend.png").exists()
     assert "reproduction" not in res
 
-    # With same-GPU intact rows, they become the primary intact condition and the stored rows a
-    # reproduction check.
+    # Same-GPU intact rows become the primary intact condition and the stored rows a
+    # reproduction check; an LLM outside PRH's pool joins via its extract.jsonl record.
+    new = "Qwen/Qwen2.5-test"
+    llms2 = [*llms, new]
+    intact2 = np.vstack([intact, intact[-1:] + 0.01])
     _write_pairs(
-        out / "reext" / "calibrated_pairs.jsonl", intact + 0.001, llms, lvms, stored_format=False
+        out / "reext" / "calibrated_pairs.jsonl", intact2 + 0.001, llms2, lvms, stored_format=False
+    )
+    for s in (0, 1):
+        _write_pairs(
+            out / f"shufw{s}" / "calibrated_pairs.jsonl",
+            np.vstack([flat, flat[-1:]]),
+            llms2,
+            lvms,
+            stored_format=False,
+        )
+    rec = {"model": new, "transform": "reext", "shape": [8, 6, 4], "bpb": 0.9}
+    (out / "extract.jsonl").write_text(json.dumps(rec) + "\n")
+    an.main()
+    assert "capability_all_tokens" not in json.loads((out / "trends.json").read_text())
+    # all-token bpb: needed for every no-BOS LLM (BLOOMZ, Qwen2.5); others keep their bpb
+    no_bos = [m for m in llms2 if m.startswith(("bigscience/bloomz", "Qwen/"))]
+    (out / "bpb.jsonl").write_text(
+        "".join(
+            json.dumps({"model": m, "adds_bos": False, "bpb_default": 1.0, "bpb_all_tokens": 1.2})
+            + "\n"
+            for m in no_bos
+        )
     )
     an.main()
     res = json.loads((out / "trends.json").read_text())
+    assert res["llms"][-1] == new and res["families"][-1] == "Qwen2.5"
+    assert res["capability_all_tokens"][-1] == pytest.approx(1 - 1.2)
+    assert "all_tokens/all 11/G/mutual_knn_k10" in res["trends"]
     assert res["reproduction"]["mutual_knn_k10"]["median_abs_diff"] == pytest.approx(0.001)
-    assert res["trends"]["Ist/mutual_knn_k10"]["median"] > 0.9
+    assert res["reproduction"]["mutual_knn_k10"]["n_llms"] == len(llms)
+    assert "all 11/I/mutual_knn_k10" in res["trends"]
+    assert res["wins"]["PRH/S0/mutual_knn_k10"] == len(llms) * len(lvms)
     assert {v[1] for v in res["verdicts"] if v[0] == "P1"} == {"S0", "S1"}
+
+
+def test_llm_outside_the_modelset_gets_info_from_its_reext_entry(tmp_path):
+    from geoprh import prh_calibration as pc
+
+    src = tmp_path / "f.pt"
+    torch.save({"feats": torch.randn(6, 3, 4), "num_params": 10, "loss": 1.0, "bpb": 0.8}, src)
+    root, text_root = tmp_path / "cache", tmp_path / "text"
+    shuf = ac.Variant(transform="shufw0")
+    assert pc._llm_meta("Qwen/x", root, text_root, shuf) is None
+    ac.push_model(text_root, "Qwen/x", shuf, src, extractor="t", seed=0)
+    assert pc._llm_meta("Qwen/x", root, text_root, shuf)["num_layers"] == 3
+    torch.save({"feats": torch.randn(6, 3, 4), "num_params": 10, "loss": 1.0, "bpb": 0.7}, src)
+    ac.push_model(text_root, "Qwen/x", ac.Variant(transform="reext"), src, extractor="t")
+    # the intact re-extraction wins over the shuffled entry: its bpb is the capability axis
+    assert pc._llm_meta("Qwen/x", root, text_root, shuf)["bpb"] == pytest.approx(0.7)

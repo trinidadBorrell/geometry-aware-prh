@@ -3,7 +3,7 @@
 # GPU pod. Launch detached:
 #   ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && nohup bash infra/runpod/run_exp031.sh > /workspace/results/oddharak/exp-031.log 2>&1 < /dev/null &"
 #
-# Stages (STAGES, comma-separated): checks, extract, score, analyze, save.
+# Stages (STAGES, comma-separated): checks, extract, bpb, score, analyze, save.
 #  - checks:  layer 0 unchanged by a token shuffle; calibration reproduces one stored
 #             prh_val_calibrated pair. Either failure stops. Re-extracted intact bloomz-560m vs
 #             the cache is logged only: the cache came from another GPU and bf16 kernels differ
@@ -19,6 +19,11 @@
 #             a quota failure here is logged, not fatal, because the scores are already saved.
 # Terminates its own pod GRACE seconds after the job, whatever its exit status (set GRACE=-1 to
 # keep the pod up). Never `pkill sleep` on a pod: the container's keep-alive is a sleep too.
+#
+# Extension to new LLM families (2026-11-28): set LLMS to the new models, PRH_CHECKS=0 (the
+# cache/score checks concern PRH's pool and passed in the first run) and LAYER0_MODELS to one model
+# per new architecture. Rows append to the same OUT, so analyze covers old and new LLMs together:
+#   LLMS="Qwen/Qwen2.5-1.5B ..." PRH_CHECKS=0 LAYER0_MODELS="..." bash infra/runpod/run_exp031.sh
 set -uo pipefail
 . /etc/rp_environment
 export PATH="$HOME/.local/bin:$PATH"
@@ -32,12 +37,15 @@ SCRATCH=/root/exp031
 TEXT_ROOT=$SCRATCH/activations
 TEXTS=$SCRATCH/texts.json  # captions, read once online so offline model runs need no dataset
 VOL_HUB=/workspace/.cache/huggingface/hub
-STAGES=${STAGES:-checks,extract,score,analyze,save}
+STAGES=${STAGES:-checks,extract,bpb,score,analyze,save}
+BPB_MODELS=${BPB_MODELS:-"bigscience/bloomz-560m bigscience/bloomz-1b1 bigscience/bloomz-1b7 bigscience/bloomz-3b bigscience/bloomz-7b1"}
 SEEDS=${SEEDS:-"0 1"}
 TRANSFORMS="reext"
 for seed in $SEEDS; do TRANSFORMS="$TRANSFORMS shufw$seed"; done
 GRACE=${GRACE:-600}
-LLMS=${LLMS:-"bigscience/bloomz-560m bigscience/bloomz-1b1 bigscience/bloomz-1b7 bigscience/bloomz-3b bigscience/bloomz-7b1 openlm-research/open_llama_3b openlm-research/open_llama_7b openlm-research/open_llama_13b huggyllama/llama-7b huggyllama/llama-13b"}
+PRH_CHECKS=${PRH_CHECKS:-1}
+LAYER0_MODELS=${LAYER0_MODELS:-"bigscience/bloomz-560m huggyllama/llama-7b"}
+LLMS=${LLMS:-"bigscience/bloomz-560mbigscience/bloomz-1b1 bigscience/bloomz-1b7 bigscience/bloomz-3b bigscience/bloomz-7b1 openlm-research/open_llama_3b openlm-research/open_llama_7b openlm-research/open_llama_13b huggyllama/llama-7b huggyllama/llama-13b"}
 mkdir -p "$OUT" "$SCRATCH" /root/hf-scratch
 git rev-parse HEAD > "$OUT/git_sha.txt" 2>/dev/null || true
 cp "$X/extract.py" "$OUT/extract.py.txt"; cp "$X/analyze.py" "$OUT/analyze.py.txt"
@@ -50,19 +58,25 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
 has() { case ",$STAGES," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
 
 # Run one extractor command for a model: offline from the volume's HF cache if the model is
-# there, otherwise download to container disk and delete the weights afterwards.
+# there, otherwise from container disk (downloaded on first use; drop_model deletes it).
 with_model() {
   local model=$1; shift
   local dir="models--${model//\//--}"
   if [ -d "$VOL_HUB/$dir/snapshots" ]; then
     HF_HUB_CACHE=$VOL_HUB HF_HUB_OFFLINE=1 timeout 50m "$@"
   else
-    echo "[$model] not in $VOL_HUB, downloading to container disk"
+    echo "[$model] not in $VOL_HUB, using container disk"
     HF_HUB_CACHE=/root/hf-scratch/hub timeout 90m "$@"
-    local st=$?
-    rm -rf "/root/hf-scratch/hub/$dir"
-    return $st
   fi
+}
+drop_model() { rm -rf "/root/hf-scratch/hub/models--${1//\//--}"; }
+# Intact bpb with every caption token scored, next to PRH's default (extract.py bpb).
+bpb() {
+  local flag="$SCRATCH/done/${1//\//__}_bpb"
+  [ -e "$flag" ] && return 0
+  with_model "$1" uv run --no-sync python "$X/extract.py" bpb --texts "$TEXTS" --model "$1" \
+    --out "$OUT" --batch-size 8
+  mkdir -p "$SCRATCH/done" && touch "$flag"
 }
 
 job() {
@@ -70,10 +84,13 @@ job() {
   [ -s "$TEXTS" ] || uv run --no-sync python "$X/extract.py" texts --texts "$TEXTS"
   if has checks; then
     uv run --no-sync pytest -q -p no:warnings tests/test_exp031_shuffle.py
-    with_model bigscience/bloomz-560m uv run --no-sync python "$X/extract.py" check-layer0 \
-      --texts "$TEXTS" --model bigscience/bloomz-560m --out "$OUT"
-    with_model huggyllama/llama-7b uv run --no-sync python "$X/extract.py" check-layer0 \
-      --texts "$TEXTS" --model huggyllama/llama-7b --out "$OUT"
+    for model in $LAYER0_MODELS; do
+      with_model "$model" uv run --no-sync python "$X/extract.py" check-layer0 \
+        --texts "$TEXTS" --model "$model" --out "$OUT"
+    done
+    echo "layer-0 checks passed"
+  fi
+  if has checks && [ "$PRH_CHECKS" = 1 ]; then
     with_model bigscience/bloomz-560m uv run --no-sync python "$X/extract.py" extract \
       --texts "$TEXTS" --model bigscience/bloomz-560m --transform reext --scratch "$SCRATCH" \
       --text-root "$TEXT_ROOT" --out "$OUT"
@@ -85,8 +102,8 @@ job() {
     echo "checks passed"
   fi
   if has extract; then
-    for tf in $TRANSFORMS; do
-      for model in $LLMS; do
+    for model in $LLMS; do  # all transforms per model, so weights are fetched once
+      for tf in $TRANSFORMS; do
         done_flag="$SCRATCH/done/${model//\//__}_$tf"
         if [ -e "$done_flag" ]; then echo "[$model $tf] done, skipping"; continue; fi
         with_model "$model" uv run --no-sync python "$X/extract.py" extract --texts "$TEXTS" \
@@ -95,13 +112,18 @@ job() {
         rm -rf "$SCRATCH/$tf/minhuh"  # upstream-format copy; the cache entry is kept
         mkdir -p "$SCRATCH/done" && touch "$done_flag"
       done
+      bpb "$model"
+      drop_model "$model"
     done
+  fi
+  if has bpb; then  # PRH's LLMs whose tokenizer adds no BOS (from the volume's HF cache)
+    for model in $BPB_MODELS; do bpb "$model"; done
   fi
   if has score; then
     for tf in $TRANSFORMS; do
       uv run --no-sync python -m geoprh.prh_calibration --root /workspace/activations \
         --text-root "$TEXT_ROOT" --text-transform "$tf" --out "$OUT/$tf" \
-        --metrics mutual_knn,cka_lin --k 10 --permutations 200
+        --metrics mutual_knn,cka_lin --k 10 --permutations 200 --llms "${LLMS// /,}"
     done
   fi
   if has analyze; then
@@ -109,8 +131,12 @@ job() {
       --stored-cal "$RES/prh_val_calibrated"
   fi
   if has save; then
-    # shuffled features only; "reext" duplicates the intact cache entries
-    (cd "$TEXT_ROOT" && find . -name "*_tf-shufw*" | tar -cf - -T - \
+    # shuffled features, plus "reext" of LLMs with no intact cache entry (the new families)
+    (cd "$TEXT_ROOT" && for d in */; do
+        m=${d%/}
+        if [ -d "/workspace/activations/$m" ]; then find "$m" -name "*_tf-shufw*"
+        else find "$m" -name "*_tf-*"; fi
+      done | tar -cf - -T - \
       | tar -C /workspace/activations -xkf -) \
       && echo "shuffled features saved to /workspace/activations" \
       || echo "WARNING: could not copy shuffled features to the volume (quota?); scores are saved"

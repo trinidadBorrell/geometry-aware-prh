@@ -148,6 +148,26 @@ def _calibrate(spec: Spec, vis: dict, lang: dict, *, permutations: int, alpha: f
     )
 
 
+def _llm_meta(model: str, root: Path, text_root: Path, text_variant: ac.Variant) -> dict | None:
+    """Model info for an LLM outside the modelset: intact cache entry first (its bpb is the
+    capability axis), then the same-hardware intact re-extraction, then the scored variant."""
+    candidates = [
+        (root, ac.Variant(pool="avg", caption_idx=0)),
+        (text_root, ac.Variant(pool="avg", caption_idx=0, transform="reext")),
+        (text_root, text_variant),
+    ]
+    for r, v in candidates:
+        layers = ac.cached_layers(r, model, v)
+        if layers:
+            meta = json.loads(ac.layer_paths(r, model, layers[0], v)[1].read_text())
+            return {
+                "num_params": meta["num_params"],
+                "num_layers": meta["num_layers"],
+                **meta.get("extras", {}),
+            }
+    return None
+
+
 def run(
     *,
     root: Path,
@@ -174,10 +194,18 @@ def run(
     if models == "reduced":
         llms = [m for m in llms if m in REDUCED_LLMS]
         lvms = [m for m in lvms if m in REDUCED_LVMS]
-    if llm_names:
-        llms = [m for m in llms if m in llm_names]
     text_root = text_root or root
     text_variant = ac.Variant(pool="avg", caption_idx=0, transform=text_transform)
+    if llm_names:
+        extra = [m for m in llm_names if m not in llms]
+        llms = [m for m in llms if m in llm_names]
+        for m in extra:  # LLMs outside the modelset, e.g. families added after PRH's pool
+            meta = _llm_meta(m, root, text_root, text_variant)
+            if meta is None:
+                print(f"[skip] {m}: not in cache")
+                continue
+            llms.append(m)
+            info[m] = meta
     if text_transform:
         missing = [m for m in llms if not ac.cached_layers(text_root, m, text_variant)]
         for m in missing:

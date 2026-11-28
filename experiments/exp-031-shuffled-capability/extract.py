@@ -97,6 +97,33 @@ def write_texts(path: Path) -> None:
     print(f"{len(texts)} captions -> {path}")
 
 
+# --------------------------------------------------------------------------- model fixes
+
+# Gemma-2 needs attention-logit soft-capping, which transformers' SDPA path ignores (4.57), so it
+# runs with eager attention. Tokenizers keep their defaults, as in PRH: BLOOMZ and Qwen2.5 add no
+# BOS, so their bpb (platonic-rep) does not score the first caption token.
+EAGER_MODEL_TYPES = {"gemma2"}
+
+
+def _patch_platonic() -> None:
+    """Use eager attention for EAGER_MODEL_TYPES inside platonic-rep's loader."""
+    import extract_features  # platonic-rep
+    import models  # platonic-rep
+
+    if getattr(models, "_exp031_patched", False):
+        return
+    orig = models.load_llm
+
+    def load_llm(path, *args, **kwargs):
+        lm = orig(path, *args, **kwargs)
+        if lm.config.model_type in EAGER_MODEL_TYPES:
+            lm.set_attn_implementation("eager")
+        return lm
+
+    models.load_llm = extract_features.load_llm = load_llm
+    models._exp031_patched = True
+
+
 # --------------------------------------------------------------------------- extraction
 
 
@@ -118,6 +145,7 @@ def feature_file(scratch: Path, model: str, transform: str) -> Path:
 
 def extract(model: str, transform: str, scratch: Path, batch_size: int, out: Path) -> Path:
     """Run platonic-rep's extractor on transformed captions; returns the feature file."""
+    _patch_platonic()
     from extract_features import extract_llm_features  # platonic-rep
 
     texts = load_texts()
@@ -176,6 +204,48 @@ def push(model: str, transform: str, scratch: Path, text_root: Path) -> int:
     return n
 
 
+def bpb_all_tokens(model: str, out: Path, batch_size: int) -> dict:
+    """Intact-caption bpb with every caption token scored, next to PRH's default.
+
+    platonic-rep scores a token from the position before it, so a tokenizer that adds no BOS
+    (BLOOMZ, Qwen2.5) leaves the first caption token unscored, which lowers bpb (Qwen2.5-1.5B:
+    1.62 vs 1.97, local test 2026-11-28). For those, the tokenizer's EOS is prepended: the document
+    separator these models saw before every pretraining document. Tokenizers that add a BOS
+    (LLaMA, Llama-3, Gemma-2) score every token already; both values then agree."""
+    _patch_platonic()
+    import models  # platonic-rep
+    import utils  # platonic-rep
+
+    texts = load_texts()
+    lm, tok = models.load_llm(model), models.load_tokenizer(model)
+    ids = tok(texts)["input_ids"]
+    adds_bos = tok.bos_token_id is not None and all(x[0] == tok.bos_token_id for x in ids)
+    device = next(lm.parameters()).device
+
+    def bpb(seqs) -> float:
+        enc = tok.pad({"input_ids": seqs}, padding="longest", return_tensors="pt")
+        vals = []
+        for i in range(0, len(texts), batch_size):
+            inp = {k: v[i : i + batch_size].to(device).long() for k, v in enc.items()}
+            with torch.no_grad():
+                logits = lm(**inp).logits
+            loss, _ = utils.cross_entropy_loss(inp, {"logits": logits})
+            vals.extend(utils.cross_entropy_to_bits_per_unit(loss.cpu(), texts[i : i + batch_size]))
+        return float(torch.stack(vals).mean())
+
+    default = bpb(ids)
+    full = default if adds_bos else bpb([[tok.eos_token_id, *x] for x in ids])
+    rec = {"model": model, "adds_bos": adds_bos, "bpb_default": default, "bpb_all_tokens": full}
+    out.mkdir(parents=True, exist_ok=True)
+    with (out / "bpb.jsonl").open("a") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    print(json.dumps(rec))
+    lm = None
+    gc.collect()
+    torch.cuda.empty_cache()
+    return rec
+
+
 # --------------------------------------------------------------------------- checks
 
 
@@ -200,10 +270,11 @@ def token_shuffle(input_ids, attention_mask, special_ids: set[int], rng) -> torc
 
 def check_layer0(model: str, out: Path, n: int = 50) -> dict:
     """Mean-pooled layer 0 must not change when tokens are permuted (no additive positions)."""
-    from models import load_llm, load_tokenizer  # platonic-rep
+    _patch_platonic()
+    import models  # platonic-rep
 
     texts = load_texts()[:n]
-    lm, tok = load_llm(model), load_tokenizer(model)
+    lm, tok = models.load_llm(model), models.load_tokenizer(model)
     enc = tok(texts, padding="longest", return_tensors="pt")
     shuf = token_shuffle(
         enc["input_ids"],
@@ -312,7 +383,8 @@ def _record(out: Path, rec: dict) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument(
-        "command", choices=["texts", "extract", "check-layer0", "check-cache", "check-score"]
+        "command",
+        choices=["texts", "extract", "bpb", "check-layer0", "check-cache", "check-score"],
     )
     p.add_argument("--texts", type=Path, default=None, help="captions JSON (see `texts`)")
     p.add_argument("--model", default=SCORE_PAIR[0])
@@ -337,6 +409,9 @@ def main() -> None:
     if a.command == "extract":
         extract(a.model, a.transform, a.scratch, a.batch_size, a.out)
         push(a.model, a.transform, a.scratch, a.text_root or root)
+        return
+    if a.command == "bpb":
+        bpb_all_tokens(a.model, a.out, a.batch_size)
         return
     if a.command == "check-layer0":
         rec = check_layer0(a.model, a.out)
