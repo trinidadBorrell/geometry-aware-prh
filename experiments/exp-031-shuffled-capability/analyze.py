@@ -183,7 +183,16 @@ def main() -> None:
     if not shuf:
         raise SystemExit(f"no shuffled calibrated pairs under {a.out}")
 
-    have = set.intersection(*(set(lm for lm, _ in c) for c in conds.values()))
+    # LLMs need I and the first seed; a further seed is used only if it covers all of them (new
+    # families were run with seed 0 only), so S is the same seeds for every LLM.
+    have = {lm for lm, _ in conds["I"]} & {lm for lm, _ in conds[shuf[0]]}
+    for c in shuf[1:]:
+        if not have <= {lm for lm, _ in conds[c]}:
+            print(f"[note] {c} does not cover every LLM; shuffled = {shuf[0]} only")
+            del conds[c]
+    shuf = [c for c in conds if c.startswith("S")]
+    if len(shuf) == 1:
+        LABELS["S"] = LABELS[shuf[0]]
     llms = sorted((m for m in have if m in info), key=lambda m: -info[m]["bpb"])
     lvms = [v for v in all_lvms if all((lm, v) in c for c in conds.values() for lm in llms)]
     cap = np.array([1 - info[m]["bpb"] for m in llms])

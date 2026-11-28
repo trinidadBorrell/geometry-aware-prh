@@ -174,14 +174,14 @@ def test_analysis_separates_a_trend_from_none(tmp_path, monkeypatch):
     _write_pairs(
         out / "reext" / "calibrated_pairs.jsonl", intact2 + 0.001, llms2, lvms, stored_format=False
     )
-    for s in (0, 1):
-        _write_pairs(
-            out / f"shufw{s}" / "calibrated_pairs.jsonl",
-            np.vstack([flat, flat[-1:]]),
-            llms2,
-            lvms,
-            stored_format=False,
-        )
+    # the new LLM has seed 0 only, so seed 1 is dropped and S = seed 0 for every LLM
+    _write_pairs(
+        out / "shufw0" / "calibrated_pairs.jsonl",
+        np.vstack([flat, flat[-1:]]),
+        llms2,
+        lvms,
+        stored_format=False,
+    )
     rec = {"model": new, "transform": "reext", "shape": [8, 6, 4], "bpb": 0.9}
     (out / "extract.jsonl").write_text(json.dumps(rec) + "\n")
     an.main()
@@ -204,7 +204,8 @@ def test_analysis_separates_a_trend_from_none(tmp_path, monkeypatch):
     assert res["reproduction"]["mutual_knn_k10"]["n_llms"] == len(llms)
     assert "all 11/I/mutual_knn_k10" in res["trends"]
     assert res["wins"]["PRH/S0/mutual_knn_k10"] == len(llms) * len(lvms)
-    assert {v[1] for v in res["verdicts"] if v[0] == "P1"} == {"S0", "S1"}
+    assert {v[1] for v in res["verdicts"] if v[0] == "P1"} == {"S0"}
+    assert not any("/S1/" in k for k in res["trends"])
 
 
 def test_llm_outside_the_modelset_gets_info_from_its_reext_entry(tmp_path):
