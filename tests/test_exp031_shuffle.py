@@ -159,3 +159,15 @@ def test_analysis_separates_a_trend_from_none(tmp_path, monkeypatch):
     verdict = {(v[0], v[1]): v[3] for v in res["verdicts"]}
     assert verdict[("P2", "S0")] == "holds"
     assert (out / "fig_trend.png").exists()
+    assert "reproduction" not in res
+
+    # With same-GPU intact rows, they become the primary intact condition and the stored rows a
+    # reproduction check.
+    _write_pairs(
+        out / "reext" / "calibrated_pairs.jsonl", intact + 0.001, llms, lvms, stored_format=False
+    )
+    an.main()
+    res = json.loads((out / "trends.json").read_text())
+    assert res["reproduction"]["mutual_knn_k10"]["median_abs_diff"] == pytest.approx(0.001)
+    assert res["trends"]["Ist/mutual_knn_k10"]["median"] > 0.9
+    assert {v[1] for v in res["verdicts"] if v[0] == "P1"} == {"S0", "S1"}

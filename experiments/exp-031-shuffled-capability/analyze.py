@@ -26,8 +26,13 @@ import matplotlib.pyplot as plt
 MEASURES = {"mutual_knn_k10": "Mutual kNN, k = 10", "cka_lin": "Linear CKA"}
 STORED_KEY = {"mutual_knn_k10": "mutual_knn", "cka_lin": "cka_lin"}  # prh_val_calibrated names
 FAMILIES = {"BLOOMZ": "bigscience/bloomz", "OpenLLaMA": "openlm-research/open_llama"}
-COLORS = {"I": "#2a78d6", "S0": "#eb6834", "S1": "#b8462a"}
-LABELS = {"I": "intact", "S0": "words shuffled (seed 0)", "S1": "words shuffled (seed 1)"}
+COLORS = {"I": "#2a78d6", "Ist": "#7aa7e0", "S0": "#eb6834", "S1": "#b8462a"}
+LABELS = {
+    "I": "intact",
+    "Ist": "intact, stored (other GPU)",
+    "S0": "words shuffled (seed 0)",
+    "S1": "words shuffled (seed 1)",
+}
 
 # Reading rules fixed in the README before the run.
 P1_MAX_SHUF_RHO = 0.6
@@ -96,12 +101,16 @@ def main() -> None:
 
     meta = json.loads((a.stored / "cross_modal.json").read_text())
     info = meta["models"]
-    conds = {"I": load_pairs(a.stored_cal / "calibrated_pairs.jsonl", STORED_KEY)}
+    stored = load_pairs(a.stored_cal / "calibrated_pairs.jsonl", STORED_KEY)
+    reext = a.out / "reext" / "calibrated_pairs.jsonl"
+    # Primary intact condition: re-extracted on the same GPU as the shuffles when available;
+    # the stored PRH scores (extracted on another GPU) are then a reproducibility check.
+    conds = {"I": load_pairs(reext), "Ist": stored} if reext.exists() else {"I": stored}
     for s in a.seeds.split(","):
         path = a.out / f"shufw{s}" / "calibrated_pairs.jsonl"
         if path.exists():
             conds[f"S{s}"] = load_pairs(path)
-    shuf = [c for c in conds if c != "I"]
+    shuf = [c for c in conds if c.startswith("S")]
     if not shuf:
         raise SystemExit(f"no shuffled calibrated pairs under {a.out}")
 
@@ -153,6 +162,22 @@ def main() -> None:
                 res["within"][f"{fam}/{c}/{m}"] = s
                 rows.append([fam, len(idx), name, LABELS[c], fmt_rho(s)])
     lines += table(["family", "LLMs", "measure", "captions", "Spearman"], rows)
+
+    if "Ist" in conds:
+        rows = []
+        for m, name in MEASURES.items():
+            d = np.abs(ex[("I", m)] - ex[("Ist", m)])
+            res.setdefault("reproduction", {})[m] = {
+                "median_abs_diff": float(np.median(d)),
+                "max_abs_diff": float(d.max()),
+            }
+            rows.append([name, float(np.median(d)), float(d.max())])
+        lines += [
+            "Reproduction: intact re-extracted on this GPU vs the stored PRH features "
+            "(another GPU), |excess difference| over pairs:",
+            "",
+            *table(["measure", "median", "max"], rows),
+        ]
 
     lines += ["## 2. Levels", ""]
     rows = []

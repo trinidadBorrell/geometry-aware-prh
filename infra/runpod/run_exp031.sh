@@ -4,16 +4,21 @@
 #   ssh root@<ip> -p <port> "cd /root/geometry-aware-prh && nohup bash infra/runpod/run_exp031.sh > /workspace/results/oddharak/exp-031.log 2>&1 < /dev/null &"
 #
 # Stages (STAGES, comma-separated): checks, extract, score, analyze, save.
-#  - checks:  layer 0 unchanged by a token shuffle; re-extracted intact bloomz-560m reproduces the
-#             cache; calibration reproduces one stored prh_val_calibrated pair. Any failure stops.
-#  - extract: one process per (LLM, seed), with a timeout. Weights come from the volume's second
-#             HF cache when present (offline), otherwise they are downloaded to container disk and
-#             deleted after use. Features go to container disk (the volume is near quota).
-#  - score:   prh_calibration on the shuffled features, rows straight to the volume (resumable).
+#  - checks:  layer 0 unchanged by a token shuffle; calibration reproduces one stored
+#             prh_val_calibrated pair. Either failure stops. Re-extracted intact bloomz-560m vs
+#             the cache is logged only: the cache came from another GPU and bf16 kernels differ
+#             (min row cosine 0.9988 at the last layer on an RTX PRO 4500, 2026-11-28).
+#  - extract: the intact captions again ("reext", the primary intact condition, extracted on the
+#             same GPU as the shuffles) and the shuffles; one process per (LLM, transform), with a
+#             timeout. Weights come from the volume's second HF cache when present (offline),
+#             otherwise they are downloaded to container disk and deleted after use. Features go
+#             to container disk (the volume is near quota).
+#  - score:   prh_calibration on the re-extracted and shuffled features, rows straight to the
+#             volume (resumable).
 #  - save:    copy the shuffled features into /workspace/activations (cache-first convention);
 #             a quota failure here is logged, not fatal, because the scores are already saved.
 # Terminates its own pod GRACE seconds after the job, whatever its exit status (set GRACE=-1 to
-# keep the pod up).
+# keep the pod up). Never `pkill sleep` on a pod: the container's keep-alive is a sleep too.
 set -uo pipefail
 . /etc/rp_environment
 export PATH="$HOME/.local/bin:$PATH"
@@ -29,6 +34,8 @@ TEXTS=$SCRATCH/texts.json  # captions, read once online so offline model runs ne
 VOL_HUB=/workspace/.cache/huggingface/hub
 STAGES=${STAGES:-checks,extract,score,analyze,save}
 SEEDS=${SEEDS:-"0 1"}
+TRANSFORMS="reext"
+for seed in $SEEDS; do TRANSFORMS="$TRANSFORMS shufw$seed"; done
 GRACE=${GRACE:-600}
 LLMS=${LLMS:-"bigscience/bloomz-560m bigscience/bloomz-1b1 bigscience/bloomz-1b7 bigscience/bloomz-3b bigscience/bloomz-7b1 openlm-research/open_llama_3b openlm-research/open_llama_7b openlm-research/open_llama_13b huggyllama/llama-7b huggyllama/llama-13b"}
 mkdir -p "$OUT" "$SCRATCH" /root/hf-scratch
@@ -63,34 +70,37 @@ job() {
   [ -s "$TEXTS" ] || uv run --no-sync python "$X/extract.py" texts --texts "$TEXTS"
   if has checks; then
     uv run --no-sync pytest -q -p no:warnings tests/test_exp031_shuffle.py
-    with_model bigscience/bloomz-560m uv run --no-sync python "$X/extract.py" check-layer0 --texts "$TEXTS" \
-      --model bigscience/bloomz-560m --out "$OUT"
-    with_model huggyllama/llama-7b uv run --no-sync python "$X/extract.py" check-layer0 --texts "$TEXTS" \
-      --model huggyllama/llama-7b --out "$OUT"
-    with_model bigscience/bloomz-560m uv run --no-sync python "$X/extract.py" extract --texts "$TEXTS" \
-      --model bigscience/bloomz-560m --transform reext --scratch "$SCRATCH" --out "$OUT"
+    with_model bigscience/bloomz-560m uv run --no-sync python "$X/extract.py" check-layer0 \
+      --texts "$TEXTS" --model bigscience/bloomz-560m --out "$OUT"
+    with_model huggyllama/llama-7b uv run --no-sync python "$X/extract.py" check-layer0 \
+      --texts "$TEXTS" --model huggyllama/llama-7b --out "$OUT"
+    with_model bigscience/bloomz-560m uv run --no-sync python "$X/extract.py" extract \
+      --texts "$TEXTS" --model bigscience/bloomz-560m --transform reext --scratch "$SCRATCH" \
+      --text-root "$TEXT_ROOT" --out "$OUT"
     uv run --no-sync python "$X/extract.py" check-cache --model bigscience/bloomz-560m \
-      --scratch "$SCRATCH" --root /workspace/activations --out "$OUT"
+      --scratch "$SCRATCH" --root /workspace/activations --out "$OUT" \
+      || echo "cache check below threshold: logged as cross-GPU drift, not fatal"
     uv run --no-sync python "$X/extract.py" check-score --root /workspace/activations \
       --stored-cal "$RES/prh_val_calibrated" --out "$OUT"
     echo "checks passed"
   fi
   if has extract; then
-    for seed in $SEEDS; do
+    for tf in $TRANSFORMS; do
       for model in $LLMS; do
-        done_flag="$SCRATCH/done/${model//\//__}_shufw$seed"
-        if [ -e "$done_flag" ]; then echo "[$model shufw$seed] done, skipping"; continue; fi
-        with_model "$model" uv run --no-sync python "$X/extract.py" extract --texts "$TEXTS" --model "$model" \
-          --transform "shufw$seed" --scratch "$SCRATCH" --text-root "$TEXT_ROOT" --out "$OUT"
-        rm -rf "$SCRATCH/shufw$seed/minhuh"  # upstream-format copy; the cache entry is kept
+        done_flag="$SCRATCH/done/${model//\//__}_$tf"
+        if [ -e "$done_flag" ]; then echo "[$model $tf] done, skipping"; continue; fi
+        with_model "$model" uv run --no-sync python "$X/extract.py" extract --texts "$TEXTS" \
+          --model "$model" --transform "$tf" --scratch "$SCRATCH" --text-root "$TEXT_ROOT" \
+          --out "$OUT"
+        rm -rf "$SCRATCH/$tf/minhuh"  # upstream-format copy; the cache entry is kept
         mkdir -p "$SCRATCH/done" && touch "$done_flag"
       done
     done
   fi
   if has score; then
-    for seed in $SEEDS; do
+    for tf in $TRANSFORMS; do
       uv run --no-sync python -m geoprh.prh_calibration --root /workspace/activations \
-        --text-root "$TEXT_ROOT" --text-transform "shufw$seed" --out "$OUT/shufw$seed" \
+        --text-root "$TEXT_ROOT" --text-transform "$tf" --out "$OUT/$tf" \
         --metrics mutual_knn,cka_lin --k 10 --permutations 200
     done
   fi
@@ -99,7 +109,9 @@ job() {
       --stored-cal "$RES/prh_val_calibrated"
   fi
   if has save; then
-    cp -rn "$TEXT_ROOT/." /workspace/activations/ \
+    # shuffled features only; "reext" duplicates the intact cache entries
+    (cd "$TEXT_ROOT" && find . -name "*_tf-shufw*" | tar -cf - -T - \
+      | tar -C /workspace/activations -xkf -) \
       && echo "shuffled features saved to /workspace/activations" \
       || echo "WARNING: could not copy shuffled features to the volume (quota?); scores are saved"
   fi

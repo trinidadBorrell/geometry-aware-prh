@@ -7,7 +7,8 @@ splits the feature file into the shared per-layer cache under the variant key
 
 Transforms:
     shufw<seed>   words (whitespace split) permuted within each caption; rng = (seed, row)
-    reext         the intact captions again (cache reproduction check; not pushed)
+    reext         the intact captions again, on the same hardware as the shuffles; also the
+                  cache reproduction check (the cache was extracted on another GPU)
 
 Commands (one model per process, so a stalled download cannot block the rest):
     uv run python experiments/exp-031-shuffled-capability/extract.py extract \\
@@ -161,9 +162,7 @@ def extract(model: str, transform: str, scratch: Path, batch_size: int, out: Pat
 
 
 def push(model: str, transform: str, scratch: Path, text_root: Path) -> int:
-    kind, seed = parse_transform(transform)
-    if kind == "reext":
-        return 0
+    _, seed = parse_transform(transform)
     variant = ac.Variant(pool="avg", caption_idx=0, transform=transform)
     n = ac.push_model(
         text_root,
