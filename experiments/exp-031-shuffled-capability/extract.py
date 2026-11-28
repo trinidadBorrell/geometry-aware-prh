@@ -285,11 +285,15 @@ def check_layer0(model: str, out: Path, n: int = 50) -> dict:
     device = next(lm.parameters()).device
     mask = enc["attention_mask"].to(device)
 
-    def layer0(ids):
-        with torch.no_grad():
-            hs = lm(input_ids=ids.to(device), attention_mask=mask).hidden_states[0]
-        m = mask.unsqueeze(-1).to(hs.dtype)
-        return ((hs * m).sum(1) / m.sum(1)).float().cpu()
+    def layer0(ids, bs: int = 8):  # batched: Gemma-2's 256k-vocab logits OOM at 50 rows
+        out = []
+        for i in range(0, len(ids), bs):
+            mk = mask[i : i + bs]
+            with torch.no_grad():
+                hs = lm(input_ids=ids[i : i + bs].to(device), attention_mask=mk).hidden_states[0]
+            m = mk.unsqueeze(-1).to(hs.dtype)
+            out.append(((hs * m).sum(1) / m.sum(1)).float().cpu())
+        return torch.cat(out)
 
     cos = _row_cosine(layer0(enc["input_ids"]), layer0(shuf))
     rec = {
