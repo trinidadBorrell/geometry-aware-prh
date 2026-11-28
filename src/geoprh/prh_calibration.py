@@ -160,11 +160,29 @@ def run(
     q_outlier: float,
     seed: int,
     device: str,
+    text_transform: str | None = None,
+    text_root: Path | None = None,
+    llm_names: list[str] | None = None,
 ) -> None:
+    """Calibrate every cached LLM x ViT pair.
+
+    `text_transform` scores a transformed text input (e.g. shuffled captions, cache key
+    `..._tf-<transform>`) read from `text_root` (default: `root`). Model info (params, bpb) still
+    comes from the intact cache entry, so capability readouts use the intact captions' bpb.
+    """
     llms, lvms, info = available(modelset, root)
     if models == "reduced":
         llms = [m for m in llms if m in REDUCED_LLMS]
         lvms = [m for m in lvms if m in REDUCED_LVMS]
+    if llm_names:
+        llms = [m for m in llms if m in llm_names]
+    text_root = text_root or root
+    text_variant = ac.Variant(pool="avg", caption_idx=0, transform=text_transform)
+    if text_transform:
+        missing = [m for m in llms if not ac.cached_layers(text_root, m, text_variant)]
+        for m in missing:
+            print(f"[skip] {m}: no {text_variant.key} under {text_root}")
+        llms = [m for m in llms if m not in missing]
     out.mkdir(parents=True, exist_ok=True)
     partial = out / "calibrated_pairs.jsonl"
     done: dict[tuple[str, str], dict] = {}
@@ -173,7 +191,6 @@ def run(
             rec = json.loads(line)
             done.setdefault((rec["llm"], rec["lvm"]), {}).update(rec["results"])
 
-    text_variant = ac.Variant(pool="avg", caption_idx=0)
     vis_variant = ac.Variant(pool="cls", caption_idx=None, modality="vision")
     wanted = [s.key for s in specs]
     total = len(llms) * len(lvms)
@@ -183,7 +200,7 @@ def run(
         for i, llm in enumerate(llms):
             if all(set(wanted) <= set(done.get((llm, v), {})) for v in lvms):
                 continue
-            lang_feats = _layers(llm, text_variant, root, q_outlier, device)
+            lang_feats = _layers(llm, text_variant, text_root, q_outlier, device)
             lang = _caches(lang_feats, specs)
             for j, lvm in enumerate(lvms):
                 missing = [s for s in specs if s.key not in done.get((llm, lvm), {})]
@@ -237,11 +254,24 @@ def run(
         q_outlier=q_outlier,
         seed=seed,
         root=root,
+        text_transform=text_transform,
     )
 
 
 def _write_payloads(
-    done, llms, lvms, info, specs, out: Path, *, permutations, alpha, q_outlier, seed, root: Path
+    done,
+    llms,
+    lvms,
+    info,
+    specs,
+    out: Path,
+    *,
+    permutations,
+    alpha,
+    q_outlier,
+    seed,
+    root: Path,
+    text_transform: str | None = None,
 ) -> None:
     """One Aristotelian-format payload per metric, padded to the full val model lists."""
     all_llms, all_lvms = get_models("val", modality="all")
@@ -286,6 +316,7 @@ def _write_payloads(
             "seed": seed,
             "git_sha": _git_sha(),
             "activations_root": str(root),
+            "text_transform": text_transform,
             "note": "rows/cols are the full val modelset; NaN where a pair was not computed",
         }
         np.save(out / spec.filename, payload)
@@ -305,6 +336,13 @@ def main() -> None:
     parser.add_argument("--q-outlier", type=float, default=0.95)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument(
+        "--text-transform", default=None, help="score a transformed text input, e.g. shufw0"
+    )
+    parser.add_argument(
+        "--text-root", type=Path, default=None, help="cache root for the text features"
+    )
+    parser.add_argument("--llms", default="", help="comma-separated subset of LLMs")
     args = parser.parse_args()
     specs = parse_specs(args.metrics, args.k)
     print(f"device: {args.device}, permutations: {args.permutations}")
@@ -319,6 +357,9 @@ def main() -> None:
         q_outlier=args.q_outlier,
         seed=args.seed,
         device=args.device,
+        text_transform=args.text_transform,
+        text_root=args.text_root,
+        llm_names=[m for m in args.llms.split(",") if m] or None,
     )
 
 

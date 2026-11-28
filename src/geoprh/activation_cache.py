@@ -51,12 +51,17 @@ class Variant:
     pool: str = "avg"
     caption_idx: int | None = 0  # text only
     modality: str = "language"
+    # Input transform applied before embedding (e.g. "shufw0": words shuffled, seed 0).
+    # None is the unmodified input, whose key is unchanged from before this field existed.
+    transform: str | None = None
 
     @property
     def key(self) -> str:
         key = f"{self.dataset.replace('/', '_')}_{self.subset}_pool-{self.pool}"
         if self.modality == "language" and self.caption_idx is not None:
             key += f"_cid-{self.caption_idx}"
+        if self.transform:
+            key += f"_tf-{self.transform}"
         return key
 
 
@@ -95,9 +100,17 @@ def _atomic_write_json(obj: dict, path: Path) -> None:
 
 
 def push_model(
-    root: Path, model: str, variant: Variant, feature_file: Path, *, extractor: str
+    root: Path,
+    model: str,
+    variant: Variant,
+    feature_file: Path,
+    *,
+    extractor: str,
+    seed: int | None = None,
 ) -> int:
-    """Split an upstream feature file into per-layer cache entries. Returns layers written."""
+    """Split an upstream feature file into per-layer cache entries. Returns layers written.
+
+    `seed` is recorded for stochastic input transforms (e.g. a shuffle seed)."""
     payload = torch.load(feature_file, map_location="cpu", weights_only=False)
     feats = payload["feats"]
     layers = [feats[:, i] for i in range(feats.shape[1])] if torch.is_tensor(feats) else feats
@@ -118,8 +131,10 @@ def push_model(
             "subset": variant.subset,
             "pool": variant.pool,
             "caption_idx": variant.caption_idx if variant.modality == "language" else None,
-            # Extraction is deterministic (eval mode, fixed dataset revision): no sampling seed.
-            "seed": None,
+            "transform": variant.transform,
+            # Extraction is deterministic (eval mode, fixed dataset revision); a seed is set only
+            # for a stochastic input transform.
+            "seed": seed,
             "dtype": str(x.dtype).removeprefix("torch."),
             "shape": list(x.shape),
             "num_params": int(payload.get("num_params", 0)) or None,
